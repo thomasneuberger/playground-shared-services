@@ -1,0 +1,220 @@
+version: '3.8'
+
+services:
+  # === AUTHENTICATION ===
+  keycloak-db:
+    image: postgres:15-alpine
+    container_name: shared-keycloak-db
+    environment:
+      POSTGRES_DB: ${KEYCLOAK_DB_NAME:-keycloak}
+      POSTGRES_USER: ${KEYCLOAK_DB_USER:-keycloak}
+      POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak_password}
+    volumes:
+      - keycloak-db-data:/var/lib/postgresql/data
+    networks:
+      - shared-services
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${KEYCLOAK_DB_USER:-keycloak}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    container_name: shared-keycloak
+    ports:
+      - "8080:8080"
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-db:5432/${KEYCLOAK_DB_NAME:-keycloak}
+      KC_DB_USERNAME: ${KEYCLOAK_DB_USER:-keycloak}
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak_password}
+      KC_HOSTNAME_ADMIN: localhost:8080
+      KC_HOSTNAME: localhost:8080
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-Change_Me_Admin_123!}
+      KC_HTTP_RELATIVE_PATH: /
+      KC_PROXY: edge
+      KC_LOG_LEVEL: info
+    volumes:
+      - ./certs:/opt/keycloak/certs:ro
+    networks:
+      - shared-services
+    depends_on:
+      keycloak-db:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    command: ["start-dev"]
+
+  # === MESSAGING ===
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: shared-rabbitmq
+    ports:
+      - "5672:5672"      # AMQP
+      - "15672:15672"    # Management UI
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - shared-services
+    restart: unless-stopped
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # === SECRET STORE ===
+  vault:
+    image: vault:latest
+    container_name: shared-vault
+    ports:
+      - "8200:8200"
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: ${VAULT_TOKEN:-myroot123}
+      VAULT_DEV_LISTEN_ADDRESS: "0.0.0.0:8200"
+    capabilities:
+      - IPC_LOCK
+    volumes:
+      - vault-data:/vault/data
+    networks:
+      - shared-services
+    restart: unless-stopped
+    command: server -dev
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8200/v1/sys/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # === PKI / CERTIFICATE AUTHORITY ===
+  step-ca:
+    image: smallstep/step-ca:latest
+    container_name: shared-step-ca
+    ports:
+      - "9000:9000"
+    environment:
+      STEPPATH: /home/step
+      STEP_CA_PASSWORD: ${STEP_CA_PASSWORD:-password123}
+      STEP_CA_PROVISIONER_PASSWORD: ${STEP_CA_PROVISIONER_PASSWORD:-provisioner123}
+    volumes:
+      - step-ca-data:/home/step
+      - ./config/step-ca/init.json:/home/step/config/init.json:ro
+    networks:
+      - shared-services
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "step", "ca", "health", "--insecure"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # === OBSERVABILITY: PROMETHEUS ===
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: shared-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    networks:
+      - shared-services
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # === OBSERVABILITY: LOKI (LOG AGGREGATION) ===
+  loki:
+    image: grafana/loki:latest
+    container_name: shared-loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./config/loki-config.yml:/etc/loki/local-config.yml:ro
+      - loki-data:/loki
+    networks:
+      - shared-services
+    restart: unless-stopped
+    command: -config.file=/etc/loki/local-config.yml
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3100/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # === OBSERVABILITY: TEMPO (TRACES) ===
+  tempo:
+    image: grafana/tempo:latest
+    container_name: shared-tempo
+    ports:
+      - "3200:3200"
+      - "4317:4317"     # OTLP gRPC receiver
+      - "4318:4318"     # OTLP HTTP receiver
+    volumes:
+      - ./config/tempo-config.yml:/etc/tempo.yml:ro
+      - tempo-data:/var/tempo
+    networks:
+      - shared-services
+    restart: unless-stopped
+    command: -config.file=/etc/tempo.yml
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3200/api/echo"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # === OBSERVABILITY: GRAFANA (DASHBOARD) ===
+  grafana:
+    image: grafana/grafana:latest
+    container_name: shared-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_INSTALL_PLUGINS: "grafana-piechart-panel"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - shared-services
+    depends_on:
+      - prometheus
+      - loki
+      - tempo
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+networks:
+  shared-services:
+    driver: bridge
+
+volumes:
+  keycloak-db-data:
+  rabbitmq-data:
+  vault-data:
+  step-ca-data:
+  prometheus-data:
+  loki-data:
+  tempo-data:
+  grafana-data:
