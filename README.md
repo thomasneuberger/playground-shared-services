@@ -97,7 +97,9 @@ docker-compose ps --format "table {{.Service}}\t{{.State}}\t{{.Status}}"
 docker-compose exec vault sh
 
 # Root Token verwenden (aus .env)
-export VAULT_TOKEN=myroot123
+export VAULT_TOKEN=<VAULT_TOKEN>
+# Dev Vault nutzt HTTP, daher Adresse explizit setzen
+export VAULT_ADDR=http://127.0.0.1:8200
 
 # Secrets erstellen
 vault kv put secret/myapp/database \
