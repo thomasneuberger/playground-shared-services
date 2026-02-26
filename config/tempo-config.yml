@@ -2,14 +2,20 @@ server:
   http_listen_port: 3200
 
 distributor:
-  rate_limit_bytes: 5242880
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+    jaeger:
+      protocols:
+        thrift_http:
+          endpoint: 0.0.0.0:14268
 
 ingester:
   max_block_duration: 5m
-
-compactor:
-  compaction:
-    compacted_block_retention: 10m
 
 storage:
   trace:
@@ -17,14 +23,6 @@ storage:
     local:
       path: /var/tempo/traces
 
-receivers:
-  otlp:
-    protocols:
-      grpc:
-        endpoint: 0.0.0.0:4317
-      http:
-        endpoint: 0.0.0.0:4318
-  jaeger:
-    protocols:
-      thrift_http:
-        endpoint: 0.0.0.0:14268
+metrics_generator:
+  storage:
+    path: /var/tempo/generator/wal
