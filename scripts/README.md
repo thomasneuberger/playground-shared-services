@@ -229,8 +229,8 @@ Import-Certificate -FilePath ".\certs\root_ca.crt" `
 curl -k http://localhost:9000/health
 
 # Check Container
-docker-compose logs step-ca
-docker-compose exec step-ca step ca health --insecure
+docker compose logs step-ca
+docker compose exec step-ca step ca health
 ```
 
 ### Zertifikat erneuern fehlgeschlagen

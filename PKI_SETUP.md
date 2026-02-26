@@ -22,20 +22,20 @@ STEP_CA_PROVISIONER_PASSWORD=ProvisionalPassword!
 ### 2. Step CA starten
 
 ```bash
-docker-compose up -d step-ca
+docker compose up -d step-ca
 
 # Logs checken
-docker-compose logs -f step-ca
+docker compose logs -f step-ca
 ```
 
 ### 3. Health Check
 
 ```bash
 # Von außerhalb des Containers
-docker-compose exec step-ca sh
+docker compose exec step-ca sh
 
 # Im Container
-step ca health --insecure
+step ca health
 ```
 
 ## 📦 Zertifikate generieren
@@ -58,7 +58,6 @@ step ca certificate \
   --san myapp.local \
   --san api.myapp.local \
   --root /path/to/root_ca.crt \
-  --insecure \
   myapp \
   myapp.crt \
   myapp.key
@@ -68,7 +67,7 @@ step ca certificate \
 
 ```bash
 # In den Step CA Container gehen
-docker-compose exec step-ca sh
+docker compose exec step-ca sh
 
 # Zertifikat generieren
 step ca certificate \
@@ -121,7 +120,7 @@ step ca certificate \
 docker cp shared-step-ca:/home/step/certs/root_ca.crt ./certs/root_ca.crt
 
 # PEM Format überprüfen
-docker-compose exec step-ca step certificate inspect --format json root_ca.crt
+docker compose exec step-ca step certificate inspect --format json root_ca.crt
 ```
 
 ## 🔑 Private CA Root in den System Trust Store laden
@@ -331,10 +330,10 @@ step ca certificate --san myapp.local --san *.myapp.local ...
 
 ```bash
 # Logs anuschauen
-docker-compose logs step-ca
+docker compose logs step-ca
 
 # Container manuell starten
-docker-compose exec step-ca /bin/sh
+docker compose exec step-ca /bin/sh
 
 # STEPPATH überprüfen
 ls -la /home/step/

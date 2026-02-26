@@ -54,23 +54,23 @@ Für Deployment auf deinem NAS siehe Abschnitt [🚀 Deployment auf NAS](#-deplo
 
 ```bash
 # Alle Services im Hintergrund starten
-docker-compose up -d
+docker compose up -d
 
 # Logs anschauen
-docker-compose logs -f
+docker compose logs -f
 
 # Spezifische Logs
-docker-compose logs -f grafana
+docker compose logs -f grafana
 ```
 
 ### 3. Services überprüfen
 
 ```bash
 # Status aller Services
-docker-compose ps
+docker compose ps
 
 # Health Check
-docker-compose ps --format "table {{.Service}}\t{{.State}}\t{{.Status}}"
+docker compose ps --format "table {{.Service}}\t{{.State}}\t{{.Status}}"
 ```
 
 ## 🌐 Zugriff auf Services
@@ -100,7 +100,7 @@ docker-compose ps --format "table {{.Service}}\t{{.State}}\t{{.Status}}"
 
 ```bash
 # In den Vault Container gehen
-docker-compose exec vault sh
+docker compose exec vault sh
 
 # Root Token verwenden (aus .env)
 export VAULT_TOKEN=<VAULT_TOKEN>
@@ -192,16 +192,16 @@ curl -G -s "http://localhost:3100/loki/api/v1/query_range" \
 
 ```bash
 # Alle Services stoppen
-docker-compose down
+docker compose down
 
 # Alle Services stoppen und Volumes löschen (ACHTUNG!)
-docker-compose down -v
+docker compose down -v
 
 # Einen Service neu starten
-docker-compose restart grafana
+docker compose restart grafana
 
 # Services in den Logs folgen
-docker-compose logs -f keycloak
+docker compose logs -f keycloak
 ```
 
 ## � Deployment auf NAS
@@ -223,13 +223,13 @@ HOST_NAME=mynas.example.com
 
 ```bash
 # Stoppe alle Services
-docker-compose down
+docker compose down
 
 # Lösche Step CA Daten (damit Zertifikate mit neuem Hostname erstellt werden)
 docker volume rm playground-shared-services_step-ca-data
 
 # Starte Services neu
-docker-compose up -d
+docker compose up -d
 ```
 
 ### 3. Zugriff auf Services
@@ -274,11 +274,11 @@ Stelle sicher, dass folgende Ports auf deinem NAS erreichbar sind:
 
 ```bash
 # Logs checken
-docker-compose logs <service-name>
+docker compose logs <service-name>
 
 # Vollständigen Rebuild versuchen
-docker-compose down -v
-docker-compose up -d --build
+docker compose down -v
+docker compose up -d --build
 ```
 
 ### Ports bereits in Verwendung
@@ -297,7 +297,7 @@ ports:
 curl http://localhost:8201/v1/sys/health
 
 # Mit Token initialisieren
-docker-compose exec vault vault operator init -key-shares=1 -key-threshold=1
+docker compose exec vault vault operator init -key-shares=1 -key-threshold=1
 ```
 
 ## 📦 Integration mit ASP.NET Core
@@ -405,20 +405,20 @@ var secret = await vaultClient.V1.Secrets.KeyValue.V2.ReadSecretAsync(path: "mya
 
 ```bash
 # Alle Services starten
-docker-compose up -d
+docker compose up -d
 
 # Status überprüfen
-docker-compose ps
+docker compose ps
 
 # Zertifikat generieren
 ./scripts/generate-certs.sh myapp.local
 
 # Logs folgen
-docker-compose logs -f
+docker compose logs -f
 
 # Services neustarten
-docker-compose down
-docker-compose up -d
+docker compose down
+docker compose up -d
 ```
 
 ## 📄 Lizenz

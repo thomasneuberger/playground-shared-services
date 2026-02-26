@@ -105,10 +105,10 @@ scripts/
 
 ### 1. Step CA starten
 ```bash
-docker-compose up -d step-ca
+docker compose up -d step-ca
 
 # Health Check
-docker-compose logs step-ca
+docker compose logs step-ca
 ```
 
 ### 2. Root CA exportieren & vertrauen
@@ -158,7 +158,7 @@ Siehe **DOTNET_INTEGRATION.md**:
 ### Health Checks
 ```bash
 # Container Health
-docker-compose ps step-ca
+docker compose ps step-ca
 
 # API Health
 curl -k http://localhost:9000/health
@@ -259,7 +259,7 @@ Jeder Service hat:
 
 ## 🎯 Nächste Schritte
 
-1. ✅ **Step CA aktivieren** → `docker-compose up -d step-ca`
+1. ✅ **Step CA aktivieren** → `docker compose up -d step-ca`
 2. ✅ **Zertifikate generieren** → `./scripts/generate-certs.sh myapp.local`
 3. ✅ **Root CA vertrauen** → OS Trust Store Import
 4. ✅ **ASP.NET Integration** → Siehe DOTNET_INTEGRATION.md

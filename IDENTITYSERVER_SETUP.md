@@ -274,7 +274,7 @@ identityserver-migrator:
 ### Nur mit Demo Config (No Database)
 
 ```bash
-docker-compose up -d postgres-identity identityserver
+docker compose up -d postgres-identity identityserver
 ```
 
 ### Mit Vault Integration
@@ -294,10 +294,10 @@ identityserver:
 
 ```bash
 # Logs anschauen
-docker-compose logs -f identityserver
+docker compose logs -f identityserver
 
 # In Container gehen
-docker-compose exec identityserver sh
+docker compose exec identityserver sh
 
 # Health Check
 curl http://localhost:5000/health

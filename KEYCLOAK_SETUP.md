@@ -7,10 +7,10 @@ Keycloak ist eine Enterprise-Grade Open-Source Identity Management Lösung mit O
 ### 1. Keycloak starten
 
 ```bash
-docker-compose up -d keycloak-db keycloak
+docker compose up -d keycloak-db keycloak
 
 # Status überprüfen
-docker-compose logs -f keycloak
+docker compose logs -f keycloak
 
 # Health Check
 curl http://localhost:8080/health
@@ -409,7 +409,7 @@ Bestehende User Directories mit Keycloak verbinden:
 ### Logs anschauen
 
 ```bash
-docker-compose logs -f keycloak
+docker compose logs -f keycloak
 ```
 
 ### Health Endpoint
@@ -509,15 +509,15 @@ nginx:
 
 ```bash
 # Keycloak läuft noch nicht? Health Check
-docker-compose exec keycloak curl -f http://localhost:8080/health || echo "Not ready"
+docker compose exec keycloak curl -f http://localhost:8080/health || echo "Not ready"
 ```
 
 ### Problem: Database migration fails
 
 ```bash
 # DB Reset (WARNING: Löscht alle Daten!)
-docker-compose exec keycloak-db psql -U keycloak -c "DROP DATABASE keycloak;"
-docker-compose exec keycloak-db psql -U keycloak -c "CREATE DATABASE keycloak;"
+docker compose exec keycloak-db psql -U keycloak -c "DROP DATABASE keycloak;"
+docker compose exec keycloak-db psql -U keycloak -c "CREATE DATABASE keycloak;"
 ```
 
 ### Problem: Invalid redirect_uri
