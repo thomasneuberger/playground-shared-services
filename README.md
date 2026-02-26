@@ -4,10 +4,10 @@ Ein vollständiges Docker Compose Setup mit Open-Source Komponenten für ein Sha
 
 ## 🚀 Komponenten
 
-- **Keycloak** (Port 8080) - OpenID Connect / OAuth2 / SAML Authentifizierung
+- **Keycloak** (Port 8082) - OpenID Connect / OAuth2 / SAML Authentifizierung
 - **RabbitMQ** (5672, 15672) - Message Queue mit Management UI
-- **Vault** (8200) - Secret Store für Geheimnisse
-- **Step CA** (9000) - Private Key Infrastructure für SSL/TLS Zertifikate
+- **Vault** (8201) - Secret Store für Geheimnisse
+- **Step CA** (9001) - Private Key Infrastructure für SSL/TLS Zertifikate
 - **Prometheus** (9090) - Metriken-Erfassung
 - **Loki** (3100) - Log-Aggregation
 - **Tempo** (3200) - Distributed Tracing (OpenTelemetry)
@@ -77,12 +77,12 @@ docker-compose ps --format "table {{.Service}}\t{{.State}}\t{{.Status}}"
 
 | Service | URL | Credentials |
 |---------|-----|-------------|
-| **Keycloak** | http://localhost:8080 | admin / (siehe .env) |
+| **Keycloak** | http://localhost:8082 | admin / (siehe .env) |
 | **Grafana** | http://localhost:3000 | admin / (siehe .env) |
 | **Prometheus** | http://localhost:9090 | - |
 | **RabbitMQ UI** | http://localhost:15672 | guest / guest |
-| **Vault** | http://localhost:8200 | Token: (siehe .env) |
-| **Step CA** | http://localhost:9000 | - |
+| **Vault** | http://localhost:8201 | Token: (siehe .env) |
+| **Step CA** | http://localhost:9001 | - |
 | **Loki** | http://localhost:3100 | - |
 | **Tempo** | http://localhost:3200 | - |
 
@@ -121,7 +121,7 @@ Keycloak wird automatisch initialisiert. Admin-Zugriff:
 
 ```bash
 # 1. Öffne Keycloak Admin Console
-# http://localhost:8080/admin
+# http://localhost:8082/admin
 
 # 2. Login mit Admin-Credentials (aus .env)
 # admin / <KEYCLOAK_ADMIN_PASSWORD>
@@ -139,7 +139,7 @@ Keycloak wird automatisch initialisiert. Admin-Zugriff:
 ```
 
 # 5. OpenID Discovery Endpoint
-# http://localhost:8080/realms/myapp/.well-known/openid-configuration
+# http://localhost:8082/realms/myapp/.well-known/openid-configuration
 ```
 ## � Step CA (PKI) Setup
 
@@ -150,7 +150,7 @@ Step CA wird automatisch beim Start initialisiert. Für Zertifikatsverwaltung:
 
 # Zertifikat generieren
 step ca certificate \
-  --ca-url http://localhost:9000 \
+  --ca-url http://localhost:9001 \
   --root ./certs/root_ca.crt \
   --insecure \
   localhost localhost.crt localhost.key
@@ -236,10 +236,10 @@ docker-compose up -d
 
 Ersetze `localhost` mit deinem Hostname:
 
-- **Keycloak**: `http://<HOST_NAME>:8080/admin`
+- **Keycloak**: `http://<HOST_NAME>:8082/admin`
 - **Grafana**: `http://<HOST_NAME>:3000`
 - **RabbitMQ**: `http://<HOST_NAME>:15672`
-- **Vault**: `http://<HOST_NAME>:8200`
+- **Vault**: `http://<HOST_NAME>:8201`
 
 ### 4. Keycloak Redirect URIs anpassen
 
@@ -255,7 +255,7 @@ In deinen App-Konfigurationen:
 ```json
 {
   "Keycloak": {
-    "Authority": "http://<HOST_NAME>:8080/realms/myapp",
+    "Authority": "http://<HOST_NAME>:8082/realms/myapp",
     ...
   }
 }
@@ -264,8 +264,8 @@ In deinen App-Konfigurationen:
 ### 6. Firewall / Netzwerk
 
 Stelle sicher, dass folgende Ports auf deinem NAS erreichbar sind:
-- 3000 (Grafana), 8080 (Keycloak), 8200 (Vault)
-- 9000 (Step CA), 15672 (RabbitMQ UI)
+- 3000 (Grafana), 8082 (Keycloak), 8201 (Vault)
+- 9001 (Step CA), 15672 (RabbitMQ UI)
 - 5672 (RabbitMQ AMQP) für App-Zugriff
 
 ## �🔧 Troubleshooting
@@ -294,7 +294,7 @@ ports:
 
 ```bash
 # Vault Health Check
-curl http://localhost:8200/v1/sys/health
+curl http://localhost:8201/v1/sys/health
 
 # Mit Token initialisieren
 docker-compose exec vault vault operator init -key-shares=1 -key-threshold=1
@@ -385,7 +385,7 @@ dotnet add package VaultSharp
 ```
 
 ```csharp
-var vaultClient = new VaultClient(new VaultClientSettings("http://localhost:8200/", auth));
+var vaultClient = new VaultClient(new VaultClientSettings("http://localhost:8201/", auth));
 var secret = await vaultClient.V1.Secrets.KeyValue.V2.ReadSecretAsync(path: "myapp");
 ```
 

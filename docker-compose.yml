@@ -22,7 +22,7 @@ services:
     image: quay.io/keycloak/keycloak:latest
     container_name: shared-keycloak
     ports:
-      - "8080:8080"
+      - "8082:8080"
     environment:
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://keycloak-db:5432/${KEYCLOAK_DB_NAME:-keycloak}
@@ -74,7 +74,7 @@ services:
     image: hashicorp/vault:latest
     container_name: shared-vault
     ports:
-      - "8200:8200"
+      - "8201:8200"
     environment:
       VAULT_DEV_ROOT_TOKEN_ID: ${VAULT_TOKEN:-myroot123}
       VAULT_DEV_LISTEN_ADDRESS: "0.0.0.0:8200"
@@ -97,7 +97,7 @@ services:
     image: smallstep/step-ca:latest
     container_name: shared-step-ca
     ports:
-      - "9000:9000"
+      - "9001:9000"
     environment:
       DOCKER_STEPCA_INIT_NAME: "Shared Services CA"
       DOCKER_STEPCA_INIT_DNS_NAMES: "step-ca,localhost,${HOST_NAME:-localhost}"
