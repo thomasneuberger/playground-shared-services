@@ -6,8 +6,7 @@ Ein vollständiges Docker Compose Setup mit Open-Source Komponenten für ein Sha
 
 - **Keycloak** (Port 8082) - OpenID Connect / OAuth2 / SAML Authentifizierung
 - **RabbitMQ** (5672, 15672) - Message Queue mit Management UI
-- **Vault** (8201) - Secret Store für Geheimnisse
-- **Step CA** (9001) - Private Key Infrastructure für SSL/TLS Zertifikate
+- **Vault** (8201) - Secret Store & PKI Engine für SSL/TLS Zertifikate
 - **Prometheus** (9090) - Metriken-Erfassung
 - **Loki** (3100) - Log-Aggregation
 - **Tempo** (3200) - Distributed Tracing (OpenTelemetry)
@@ -37,14 +36,13 @@ KEYCLOAK_ADMIN_PASSWORD=Change_Me_Admin_456!
 # RabbitMQ (Message Broker)
 RABBITMQ_PASSWORD=secure_rabbit_password
 
-# Vault (Secret Store)
+# Vault (Secret Store & PKI)
 VAULT_TOKEN=secure_vault_token
+PKI_COMMON_NAME=Shared Services Root CA
+PKI_ORG=Shared Services
 
 # Grafana (Monitoring Dashboard)
 GRAFANA_PASSWORD=Change_Me_Grafana_789!
-
-# Step CA (Certificate Authority)
-STEP_CA_PASSWORD=Change_Me_StepCA_012!
 ```
 
 **Hinweis:** Für lokale Entwicklung kannst du `HOST_NAME=localhost` belassen. 
@@ -82,7 +80,6 @@ docker compose ps --format "table {{.Service}}\t{{.State}}\t{{.Status}}"
 | **Prometheus** | http://localhost:9090 | - |
 | **RabbitMQ UI** | http://localhost:15672 | guest / guest |
 | **Vault** | http://localhost:8201 | Token: (siehe .env) |
-| **Step CA** | http://localhost:9001 | - |
 | **Loki** | http://localhost:3100 | - |
 | **Tempo** | http://localhost:3200 | - |
 
@@ -141,25 +138,38 @@ Keycloak wird automatisch initialisiert. Admin-Zugriff:
 # 5. OpenID Discovery Endpoint
 # http://localhost:8082/realms/myapp/.well-known/openid-configuration
 ```
-## � Step CA (PKI) Setup
 
-Step CA wird automatisch beim Start initialisiert. Für Zertifikatsverwaltung:
+## 🔑 Vault PKI Setup
+
+Vault PKI wird automatisch beim Start initialisiert. Für Zertifikatsverwaltung:
 
 ```bash
-# Step CLI installieren: https://smallstep.com/docs/step-cli/installation/
+# Vault CLI installieren: https://www.vaultproject.io/downloads
 
-# Zertifikat generieren
-step ca certificate \
-  --ca-url http://localhost:9001 \
-  --root ./certs/root_ca.crt \
-  --insecure \
-  localhost localhost.crt localhost.key
+# Zertifikat generieren (Windows PowerShell)
+.\scripts\generate-certs-vault.ps1 -Domain "localhost"
 
-# Zertifikat Details anschauen
-step certificate inspect ./localhost.crt
+# Zertifikat generieren (Linux/macOS)
+./scripts/generate-certs-vault.sh -d localhost
+
+# Root CA exportieren
+.\scripts\generate-certs-vault.ps1 -ExportRootCA
 ```
 
-**Wichtig**: Root CA im System Trust Store registrieren (siehe [PKI_SETUP.md](PKI_SETUP.md))
+**Wichtig**: Root CA im System Trust Store registrieren:
+
+```powershell
+# Windows (als Administrator)
+certutil -addstore -f "ROOT" ".\certs\root_ca.crt"
+```
+
+```bash
+# Linux
+sudo cp ./certs/root_ca.crt /usr/local/share/ca-certificates/
+sudo update-ca-certificates
+```
+
+Siehe [PKI_SETUP_VAULT.md](PKI_SETUP_VAULT.md) für detaillierte Dokumentation.
 
 ## �📨 RabbitMQ Setup
 

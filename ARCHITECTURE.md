@@ -298,7 +298,7 @@
 1. **Authentication**: Apps → Keycloak (OpenID Connect/OAuth2/SAML) ✓
 2. **Secrets**: Apps → Vault (encrypted credentials) ✓
 3. **Messaging**: App A → RabbitMQ → App B (async communication) ✓
-4. **Certificates**: Step CA → Apps (HTTPS/mTLS) ✓
+4. **Certificates**: Vault PKI → Apps (HTTPS/mTLS) ✓
 5. **Observability**: Apps → Prometheus/Loki/Tempo → Grafana (insights) ✓
 
 ## Port Mapping Summary
@@ -308,8 +308,7 @@
 | Keycloak | 8080 | HTTP | OpenID Connect/OAuth2/SAML Server |
 | RabbitMQ AMQP | 5672 | TCP | Message Broker |
 | RabbitMQ UI | 15672 | HTTP | Management Console |
-| Vault | 8200 | HTTP | Secret Management |
-| Step CA | 9000 | HTTP | Certificate Authority |
+| Vault | 8200 | HTTP | Secret Management & PKI |
 | Prometheus | 9090 | HTTP | Metrics DB |
 | Loki | 3100 | HTTP | Log Aggregation |
 | Tempo | 3200 | HTTP | Tracing Backend |
@@ -325,7 +324,6 @@ Alle Services laufen im `shared-services` Docker Netzwerk und kommunizieren inte
 - `keycloak-db:5432`
 - `rabbitmq:5672`
 - `vault:8200`
-- `step-ca:9000`
 - `prometheus:9090`
 - `loki:3100`
 - `tempo:3200`
