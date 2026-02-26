@@ -27,6 +27,9 @@ Ein vollständiges Docker Compose Setup mit Open-Source Komponenten für ein Sha
 Öffne die `.env` Datei und ändere die Passwörter (Standard-Werte sind bereits konfiguriert):
 
 ```env
+# Hostname (für NAS Deployment - später änderbar)
+HOST_NAME=localhost
+
 # Keycloak (Identity Management)
 KEYCLOAK_DB_PASSWORD=Change_Me_Keycloak_123!
 KEYCLOAK_ADMIN_PASSWORD=Change_Me_Admin_456!
@@ -43,6 +46,9 @@ GRAFANA_PASSWORD=Change_Me_Grafana_789!
 # Step CA (Certificate Authority)
 STEP_CA_PASSWORD=Change_Me_StepCA_012!
 ```
+
+**Hinweis:** Für lokale Entwicklung kannst du `HOST_NAME=localhost` belassen. 
+Für Deployment auf deinem NAS siehe Abschnitt [🚀 Deployment auf NAS](#-deployment-auf-nas).
 
 ### 2. Services starten
 
@@ -198,7 +204,71 @@ docker-compose restart grafana
 docker-compose logs -f keycloak
 ```
 
-## 🔧 Troubleshooting
+## � Deployment auf NAS
+
+Wenn du die Services auf deinem NAS (statt localhost) betreiben möchtest:
+
+### 1. Hostname in .env konfigurieren
+
+```env
+# Ersetze localhost mit deinem NAS Hostname/IP
+HOST_NAME=nas.local
+# oder
+HOST_NAME=192.168.1.100
+# oder
+HOST_NAME=mynas.example.com
+```
+
+### 2. Services nach Hostname-Änderung neu starten
+
+```bash
+# Stoppe alle Services
+docker-compose down
+
+# Lösche Step CA Daten (damit Zertifikate mit neuem Hostname erstellt werden)
+docker volume rm playground-shared-services_step-ca-data
+
+# Starte Services neu
+docker-compose up -d
+```
+
+### 3. Zugriff auf Services
+
+Ersetze `localhost` mit deinem Hostname:
+
+- **Keycloak**: `http://<HOST_NAME>:8080/admin`
+- **Grafana**: `http://<HOST_NAME>:3000`
+- **RabbitMQ**: `http://<HOST_NAME>:15672`
+- **Vault**: `http://<HOST_NAME>:8200`
+
+### 4. Keycloak Redirect URIs anpassen
+
+In Keycloak Admin Console → Clients → dein Client:
+
+- **Valid Redirect URIs**: `http://<HOST_NAME>:YOUR_APP_PORT/*`
+- **Web Origins**: `http://<HOST_NAME>:YOUR_APP_PORT`
+
+### 5. ASP.NET Core Apps anpassen
+
+In deinen App-Konfigurationen:
+
+```json
+{
+  "Keycloak": {
+    "Authority": "http://<HOST_NAME>:8080/realms/myapp",
+    ...
+  }
+}
+```
+
+### 6. Firewall / Netzwerk
+
+Stelle sicher, dass folgende Ports auf deinem NAS erreichbar sind:
+- 3000 (Grafana), 8080 (Keycloak), 8200 (Vault)
+- 9000 (Step CA), 15672 (RabbitMQ UI)
+- 5672 (RabbitMQ AMQP) für App-Zugriff
+
+## �🔧 Troubleshooting
 
 ### Services starten nicht
 
