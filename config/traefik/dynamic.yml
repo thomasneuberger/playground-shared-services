@@ -6,20 +6,31 @@ http:
       entryPoints:
         - websecure
       service: vault-service
-      tls: {}
+      tls:
+        certResolver: vault-cert
+    
+    keycloak:
+      rule: "Host(`keycloak.local`)"
+      entryPoints:
+        - websecure
+      service: keycloak-service
+      tls:
+        certResolver: keycloak-cert
   
   services:
     vault-service:
       loadBalancer:
         servers:
-          - url: "http://vault:8200"
+          - url: "http://vault:8201"
+    
+    keycloak-service:
+      loadBalancer:
+        servers:
+          - url: "http://keycloak:8080"
 
 tls:
   certificates:
     - certFile: /certs/vault.local.crt
       keyFile: /certs/vault.local.key
-  stores:
-    default:
-      defaultCertificate:
-        certFile: /certs/vault.local.crt
-        keyFile: /certs/vault.local.key
+    - certFile: /certs/keycloak.local.crt
+      keyFile: /certs/keycloak.local.key

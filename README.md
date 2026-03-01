@@ -117,7 +117,7 @@ vault kv get secret/myapp/database
 Keycloak wird automatisch initialisiert. Admin-Zugriff:
 
 ```bash
-# 1. Öffne Keycloak Admin Console
+# 1. Öffne Keycloak Admin Console (HTTP)
 # http://localhost:8082/admin
 
 # 2. Login mit Admin-Credentials (aus .env)
@@ -133,11 +133,29 @@ Keycloak wird automatisch initialisiert. Admin-Zugriff:
 # - Client Protocol: openid-connect
 # - Access Type: confidential
 # - Valid Redirect URIs: http://localhost:YOUR_PORT/* (z.B. http://localhost:5001/*)
+#                        https://keycloak.local/* (für HTTPS via Traefik)
 ```
 
-# 5. OpenID Discovery Endpoint
-# http://localhost:8082/realms/myapp/.well-known/openid-configuration
+### HTTPS-Konfiguration für Keycloak (Traefik TLS Termination)
+
+Keycloak kann über HTTPS via Traefik mit Vault PKI Zertifikaten konfiguriert werden:
+
+📖 **[KEYCLOAK_VAULT_HTTPS.md](./KEYCLOAK_VAULT_HTTPS.md)** - Vollständige Anleitung zur HTTPS-Konfiguration
+
+Quick Start:
+```powershell
+# Zertifikat von Vault PKI generieren
+.\scripts\generate-certs-vault.ps1 -Domain "keycloak.local"
+
+# Services neu starten (Traefik lädt das Zertifikat automatisch)
+docker compose up -d
 ```
+
+Dann über folgende URLs zugreifen:
+- HTTP: http://localhost:8082/admin (direkter Keycloak-Zugriff)
+- HTTPS: https://keycloak.local/admin (über Traefik @ Port 8443)
+
+**Hinweis:** Für HTTPS via Traefik muss `keycloak.local` in deiner `/etc/hosts` (Linux/macOS) oder `C:\Windows\System32\drivers\etc\hosts` (Windows) eingetragen sein, oder du nutzt einen echten DNS-Namen.
 
 ## 🔑 Vault PKI Setup
 

@@ -37,6 +37,24 @@ The platform now uses **HashiCorp Vault PKI Engine** (not Step CA).
 ./generate-certs-vault.sh -c "client@example.com" -r client-cert
 ```
 
+### Setup Keycloak Certificate (for Traefik HTTPS)
+
+Use the same scripts as above. The certificate is automatically picked up by Traefik:
+
+**Windows:**
+```powershell
+.\generate-certs-vault.ps1 -Domain "keycloak.local"
+```
+
+**Linux/macOS:**
+```bash
+./generate-certs-vault.sh -d keycloak.local
+```
+
+Then restart services: `docker compose up -d`
+
+👉 **[../../KEYCLOAK_VAULT_HTTPS.md](../KEYCLOAK_VAULT_HTTPS.md)** - Full Keycloak HTTPS setup guide
+
 ## 📚 Documentation
 
 - **[README_VAULT_PKI.md](./README_VAULT_PKI.md)** - Full Vault PKI documentation
