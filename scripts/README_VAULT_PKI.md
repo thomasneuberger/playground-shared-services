@@ -135,6 +135,7 @@ Next steps:
 ### 2. `generate-certs-vault.sh` (Linux/macOS)
 
 Equivalent zum PowerShell-Script für Unix-basierte Systeme.
+Es unterstützt zusätzlich PowerShell-kompatible Parameter-Aliase wie `-Domain`, `-IpSans` und `-ExportRootCA`.
 
 #### Voraussetzungen
 - Vault CLI installiert

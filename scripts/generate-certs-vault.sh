@@ -1,299 +1,313 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Generate certificates using Vault PKI Engine - Linux/macOS Edition
 
-set -e
+set -euo pipefail
 
-# Function to read token from .env file
-get_vault_token_from_env() {
-    if [ -f ".env" ]; then
-        # Read VAULT_TOKEN from .env file
-        local token=$(grep "^VAULT_TOKEN=" .env | cut -d '=' -f2-)
-        if [ -n "$token" ]; then
-            echo "$token"
-            return 0
-        fi
-    fi
-    return 1
-}
-
-# Default values
-VAULT_ADDR="${VAULT_ADDR:-http://localhost:8201}"
-# VAULT_TOKEN will be determined later with priority: param > env > .env > default
-OUTPUT_DIR="./certs"
+# Defaults
+DOMAIN=""
+COMMON_NAME=""
+IP_SANS=""
 ROLE="server-cert"
-TOKEN_FROM_PARAM=""
+VAULT_ADDR="${VAULT_ADDR:-http://localhost:8201}"
+VAULT_TOKEN_PARAM=""
+OUTPUT_DIR="./certs"
+EXPORT_ROOT_CA=false
 
-# Color output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
 info() { echo -e "${CYAN}[INFO]${NC}  $1"; }
-success() { echo -e "${GREEN}[OK]${NC}    $1"; }
-warning() { echo -e "${YELLOW}[WARN]${NC}  $1"; }
-error() { echo -e "${RED}[ERROR]${NC} $1"; }
+ok() { echo -e "${GREEN}[OK]${NC}    $1"; }
+warn() { echo -e "${YELLOW}[WARN]${NC}  $1"; }
+err() { echo -e "${RED}[ERROR]${NC} $1"; }
 
-# Help message
-show_help() {
-    cat << EOF
-Vault PKI Certificate Generator
+usage() {
+    cat <<'EOF'
+Vault PKI Certificate Generator (Bash)
 
-Usage: $0 [OPTIONS]
+Usage:
+  ./scripts/generate-certs-vault.sh [OPTIONS]
 
-OPTIONS:
-    -d, --domain DOMAIN          Domain name for server certificate
-    -c, --common-name NAME       Common name for client certificate
-    -i, --ip-sans IPS            Comma-separated IP addresses for SANs
-    -r, --role ROLE              Vault PKI role (server-cert, client-cert, service-cert)
-    -a, --vault-addr ADDR        Vault address (default: http://localhost:8201)
-    -t, --vault-token TOKEN      Vault token (default: from parameter > \$VAULT_TOKEN > .env file > myroot123)
-    -o, --output-dir DIR         Output directory (default: ./certs)
-    --root-ca                    Export root CA certificate only
-    -h, --help                   Show this help message
+Options (Bash style):
+  -d, --domain DOMAIN
+  -c, --common-name NAME
+  -i, --ip-sans IPS
+  -r, --role ROLE                (server-cert|client-cert|service-cert)
+  -a, --vault-addr ADDR
+  -t, --vault-token TOKEN
+  -o, --output-dir DIR
+      --root-ca
+  -h, --help
 
-EXAMPLES:
-    # Generate server certificate for localhost
-    $0 -d localhost
+Options (PowerShell-compatible aliases):
+  -Domain DOMAIN
+  -CommonName NAME
+  -IpSans IPS
+  -Role ROLE
+  -VaultAddr ADDR
+  -VaultToken TOKEN
+  -OutputDir DIR
+  -ExportRootCA
 
-    # Generate server certificate with IP SAN
-    $0 -d myapp.local -i "192.168.1.10,127.0.0.1"
-
-    # Generate client certificate
-    $0 -c "user@example.com" -r client-cert
-
-    # Generate service certificate (server + client)
-    $0 -d myservice.local -r service-cert
-
-    # Export root CA
-    $0 --root-ca
-
+Examples:
+  ./scripts/generate-certs-vault.sh -d rabbit.local -i "192.168.178.35"
+  ./scripts/generate-certs-vault.sh -Domain rabbit.local -IpSans "192.168.178.35"
+  ./scripts/generate-certs-vault.sh -c "user@example.com" -r client-cert
+  ./scripts/generate-certs-vault.sh --root-ca
 EOF
-    exit 0
 }
 
-# Parse arguments
-EXPORT_ROOT_CA=false
-DOMAIN=""
-COMMON_NAME=""
-IP_SANS=""
+read_token_from_env_file() {
+    local env_file=".env"
+    if [[ -f "$env_file" ]]; then
+        sed -n 's/^VAULT_TOKEN=//p' "$env_file" | head -n 1
+    fi
+}
 
-while [[ $# -gt 0 ]]; do
-    case $1 in
-        -d|--domain)
-            DOMAIN="$2"
-            shift 2
-            ;;
-        -c|--common-name)
-            COMMON_NAME="$2"
-            shift 2
-            ;;
-        -i|--ip-sans)
-            IP_SANS="$2"
-            shift 2
-            ;;
-        -r|--role)
-            ROLE="$2"
-            shift 2
-            ;;
-        -a|--vault-addr)
-            VAULT_ADDR="$2"
-            shift 2
-            ;;
-        -t|--vault-token)
-            TOKEN_FROM_PARAM="$2"
-            shift 2
-            ;;
-        -o|--output-dir)
-            OUTPUT_DIR="$2"
-            shift 2
-            ;;
-        --root-ca)
-            EXPORT_ROOT_CA=true
-            shift
-            ;;
-        -h|--help)
-            show_help
-            ;;
+require_value() {
+    local opt_name="$1"
+    local opt_value="${2:-}"
+    if [[ -z "$opt_value" ]]; then
+        err "Missing value for $opt_name"
+        exit 1
+    fi
+}
+
+parse_args() {
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -d|--domain|-Domain)
+                require_value "$1" "${2:-}"
+                DOMAIN="$2"
+                shift 2
+                ;;
+            -c|--common-name|-CommonName)
+                require_value "$1" "${2:-}"
+                COMMON_NAME="$2"
+                shift 2
+                ;;
+            -i|--ip-sans|-IpSans)
+                require_value "$1" "${2:-}"
+                IP_SANS="$2"
+                shift 2
+                ;;
+            -r|--role|-Role)
+                require_value "$1" "${2:-}"
+                ROLE="$2"
+                shift 2
+                ;;
+            -a|--vault-addr|-VaultAddr)
+                require_value "$1" "${2:-}"
+                VAULT_ADDR="$2"
+                shift 2
+                ;;
+            -t|--vault-token|-VaultToken)
+                require_value "$1" "${2:-}"
+                VAULT_TOKEN_PARAM="$2"
+                shift 2
+                ;;
+            -o|--output-dir|-OutputDir)
+                require_value "$1" "${2:-}"
+                OUTPUT_DIR="$2"
+                shift 2
+                ;;
+            --root-ca|-ExportRootCA)
+                EXPORT_ROOT_CA=true
+                shift
+                ;;
+            -h|--help)
+                usage
+                exit 0
+                ;;
+            *)
+                err "Unknown option: $1"
+                usage
+                exit 1
+                ;;
+        esac
+    done
+}
+
+validate_role() {
+    case "$ROLE" in
+        server-cert|client-cert|service-cert) ;;
         *)
-            error "Unknown option: $1"
-            echo "Use -h or --help for usage information"
+            err "Invalid role '$ROLE'. Use: server-cert, client-cert, service-cert"
             exit 1
             ;;
     esac
-done
+}
 
-# Banner
+json_get_string() {
+    local filter="$1"
+    jq -r "$filter // empty"
+}
+
+json_get_array_lines() {
+    local filter="$1"
+    jq -r "$filter // [] | .[]"
+}
+
 echo ""
 echo "============================================================"
-echo "   Vault PKI Certificate Generator"
+echo "  Vault PKI Certificate Generator (Bash)"
 echo "============================================================"
 echo ""
 
-# Determine Vault token (priority: parameter > env var > .env file > default)
-if [ -n "$TOKEN_FROM_PARAM" ]; then
-    VAULT_TOKEN="$TOKEN_FROM_PARAM"
+parse_args "$@"
+validate_role
+
+if ! command -v vault >/dev/null 2>&1; then
+    err "Vault CLI not found. Install from https://www.vaultproject.io/downloads"
+    exit 1
+fi
+
+if ! command -v jq >/dev/null 2>&1; then
+    err "jq is required for JSON parsing. Please install jq and retry."
+    exit 1
+fi
+
+if [[ -n "$VAULT_TOKEN_PARAM" ]]; then
+    VAULT_TOKEN="$VAULT_TOKEN_PARAM"
     info "Using provided Vault token"
-elif [ -n "$VAULT_TOKEN" ]; then
+elif [[ -n "${VAULT_TOKEN:-}" ]]; then
+    VAULT_TOKEN="${VAULT_TOKEN}"
     info "Using Vault token from environment variable"
 else
-    # Try to read from .env file
-    if token_from_file=$(get_vault_token_from_env); then
+    token_from_file="$(read_token_from_env_file || true)"
+    if [[ -n "$token_from_file" ]]; then
         VAULT_TOKEN="$token_from_file"
         info "Using Vault token from .env file"
     else
         VAULT_TOKEN="myroot123"
-        warning "No VAULT_TOKEN found, using default: myroot123"
+        warn "No VAULT_TOKEN found, using default: myroot123"
     fi
 fi
 
-# Set Vault environment
 export VAULT_ADDR
 export VAULT_TOKEN
 
-# Check if vault CLI is available
-if ! command -v vault &> /dev/null; then
-    error "Vault CLI not found. Please install it from: https://www.vaultproject.io/downloads"
-    exit 1
-fi
-
-# Create output directory
 mkdir -p "$OUTPUT_DIR"
-info "Output directory: $OUTPUT_DIR"
 
-# Export Root CA only
-if [ "$EXPORT_ROOT_CA" = true ]; then
+if [[ "$EXPORT_ROOT_CA" == true ]]; then
     info "Exporting Root CA certificate..."
-    
-    ROOT_CA_PATH="$OUTPUT_DIR/root_ca.crt"
-    if vault read -field=certificate pki/cert/ca > "$ROOT_CA_PATH"; then
-        success "Root CA exported to: $ROOT_CA_PATH"
-        echo ""
-        info "To trust this CA:"
-        echo "  # Linux:"
-        echo "  sudo cp $ROOT_CA_PATH /usr/local/share/ca-certificates/"
-        echo "  sudo update-ca-certificates"
-        echo ""
-        echo "  # macOS:"
-        echo "  sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain $ROOT_CA_PATH"
-        echo ""
+    root_ca_path="$OUTPUT_DIR/root_ca.crt"
+    if vault read -field=certificate pki/cert/ca > "$root_ca_path"; then
+        ok "Root CA exported to: $root_ca_path"
+        exit 0
     else
-        error "Failed to export root CA"
+        err "Failed to export root CA"
         exit 1
     fi
-    
-    exit 0
 fi
 
-# Determine what to generate
-CERT_NAME=""
-CERT_PATH=""
+cert_name=""
+cert_path=""
 
-if [ "$ROLE" = "client-cert" ]; then
-    if [ -z "$COMMON_NAME" ]; then
-        error "Common name is required for client certificates"
-        info "Usage: $0 -c \"user@example.com\" -r client-cert"
+if [[ "$ROLE" == "client-cert" ]]; then
+    if [[ -z "$COMMON_NAME" ]]; then
+        err "CommonName is required for client certificates"
+        info "Usage: ./scripts/generate-certs-vault.sh -CommonName user@example.com -Role client-cert"
         exit 1
     fi
-    CERT_NAME="$COMMON_NAME"
-    CERT_PATH="$OUTPUT_DIR/$(echo $COMMON_NAME | tr '@.' '__')"
+    cert_name="$COMMON_NAME"
+    safe_name="${COMMON_NAME//@/_}"
+    safe_name="${safe_name//./_}"
+    cert_path="$OUTPUT_DIR/$safe_name"
 else
-    if [ -z "$DOMAIN" ]; then
-        error "Domain is required for server/service certificates"
-        info "Usage: $0 -d \"localhost\""
+    if [[ -z "$DOMAIN" ]]; then
+        err "Domain is required for server/service certificates"
+        info "Usage: ./scripts/generate-certs-vault.sh -Domain rabbit.local"
         exit 1
     fi
-    CERT_NAME="$DOMAIN"
-    CERT_PATH="$OUTPUT_DIR/$DOMAIN"
+    cert_name="$DOMAIN"
+    cert_path="$OUTPUT_DIR/$DOMAIN"
 fi
 
 info "Certificate Type: $ROLE"
-info "Certificate Name: $CERT_NAME"
+info "Certificate Name: $cert_name"
 echo ""
 
-# Build Vault command
-VAULT_CMD="vault write -format=json pki_int/issue/$ROLE"
-
-if [ "$ROLE" = "client-cert" ]; then
-    VAULT_CMD="$VAULT_CMD common_name=$COMMON_NAME"
+vault_args=(write -format=json "pki_int/issue/$ROLE")
+if [[ "$ROLE" == "client-cert" ]]; then
+    vault_args+=("common_name=$COMMON_NAME")
 else
-    VAULT_CMD="$VAULT_CMD common_name=$DOMAIN alt_names=$DOMAIN"
+    vault_args+=("common_name=$DOMAIN" "alt_names=$DOMAIN")
 fi
-
-if [ -n "$IP_SANS" ]; then
-    VAULT_CMD="$VAULT_CMD ip_sans=$IP_SANS"
+if [[ -n "$IP_SANS" ]]; then
+    vault_args+=("ip_sans=$IP_SANS")
 fi
+vault_args+=("ttl=8760h")
 
-VAULT_CMD="$VAULT_CMD ttl=8760h"
-
-# Generate certificate
 info "Generating certificate from Vault PKI..."
-if RESULT=$($VAULT_CMD 2>&1); then
-    # Extract data using jq or grep/sed
-    if command -v jq &> /dev/null; then
-        CERTIFICATE=$(echo "$RESULT" | jq -r '.data.certificate')
-        PRIVATE_KEY=$(echo "$RESULT" | jq -r '.data.private_key')
-        CA_CHAIN=$(echo "$RESULT" | jq -r '.data.ca_chain | join("\n")')
-        SERIAL=$(echo "$RESULT" | jq -r '.data.serial_number')
-    else
-        warning "jq not found, using basic parsing"
-        CERTIFICATE=$(echo "$RESULT" | grep -o '"certificate":"[^"]*"' | cut -d'"' -f4 | sed 's/\\n/\n/g')
-        PRIVATE_KEY=$(echo "$RESULT" | grep -o '"private_key":"[^"]*"' | cut -d'"' -f4 | sed 's/\\n/\n/g')
-        # This is simplified and may not work perfectly for ca_chain
-        CA_CHAIN=$(echo "$RESULT" | grep -o '"ca_chain":\[[^]]*\]' | sed 's/\\n/\n/g')
-        SERIAL=$(echo "$RESULT" | grep -o '"serial_number":"[^"]*"' | cut -d'"' -f4)
-    fi
-    
-    # Save certificate with CA chain
-    echo "$CERTIFICATE" > "${CERT_PATH}.crt"
-    if [ -n "$CA_CHAIN" ]; then
-        echo "$CA_CHAIN" >> "${CERT_PATH}.crt"
-    fi
-    success "Certificate with CA chain saved: ${CERT_PATH}.crt"
-
-    echo "$PRIVATE_KEY" > "${CERT_PATH}.key"
-    chmod 600 "${CERT_PATH}.key"
-    success "Private key saved: ${CERT_PATH}.key"
-    
-    echo "$CA_CHAIN" > "${CERT_PATH}-ca-chain.crt"
-    success "CA chain saved: ${CERT_PATH}-ca-chain.crt"
-    
-    # Create bundle
-    cat "${CERT_PATH}.crt" "${CERT_PATH}-ca-chain.crt" > "${CERT_PATH}-bundle.crt"
-    success "Certificate bundle saved: ${CERT_PATH}-bundle.crt"
-    
-    # Summary
-    echo ""
-    echo "============================================================"
-    success "Certificate generated successfully!"
-    echo "============================================================"
-    echo ""
-    echo -e "${CYAN}Files created:${NC}"
-    echo "  Certificate:    ${CERT_PATH}.crt"
-    echo "  Private Key:    ${CERT_PATH}.key"
-    echo "  CA Chain:       ${CERT_PATH}-ca-chain.crt"
-    echo "  Bundle:         ${CERT_PATH}-bundle.crt"
-    echo ""
-    info "Serial Number: $SERIAL"
-    echo ""
-    
-    # Export Root CA if not exists
-    ROOT_CA_PATH="$OUTPUT_DIR/root_ca.crt"
-    if [ ! -f "$ROOT_CA_PATH" ]; then
-        info "Exporting Root CA certificate..."
-        vault read -field=certificate pki/cert/ca > "$ROOT_CA_PATH"
-        success "Root CA exported to: $ROOT_CA_PATH"
-    fi
-    
-    echo ""
-    echo -e "${YELLOW}Next steps:${NC}"
-    echo "  1. Trust the Root CA (if not already done)"
-    echo "  2. Use the certificate in your application"
-    echo ""
-    
-else
-    error "Failed to generate certificate"
-    echo "$RESULT"
+if ! result_json="$(vault "${vault_args[@]}" 2>&1)"; then
+    err "Failed to generate certificate:"
+    echo "$result_json"
     exit 1
 fi
+
+certificate="$(echo "$result_json" | json_get_string '.data.certificate')"
+private_key="$(echo "$result_json" | json_get_string '.data.private_key')"
+serial_number="$(echo "$result_json" | json_get_string '.data.serial_number')"
+expiration="$(echo "$result_json" | json_get_string '.data.expiration')"
+
+if [[ -z "$certificate" || -z "$private_key" ]]; then
+    err "Vault response missing certificate or private key"
+    exit 1
+fi
+
+ca_chain_lines="$(echo "$result_json" | json_get_array_lines '.data.ca_chain')"
+
+cert_file="${cert_path}.crt"
+key_file="${cert_path}.key"
+ca_chain_file="${cert_path}-ca-chain.crt"
+bundle_file="${cert_path}-bundle.crt"
+
+{
+    printf '%s\n' "$certificate"
+    if [[ -n "$ca_chain_lines" ]]; then
+        printf '%s\n' "$ca_chain_lines"
+    fi
+} > "$cert_file"
+ok "Certificate with CA chain saved: $cert_file"
+
+printf '%s\n' "$private_key" > "$key_file"
+chmod 600 "$key_file" 2>/dev/null || true
+ok "Private key saved: $key_file"
+
+if [[ -n "$ca_chain_lines" ]]; then
+    printf '%s\n' "$ca_chain_lines" > "$ca_chain_file"
+else
+    : > "$ca_chain_file"
+fi
+ok "CA chain saved: $ca_chain_file"
+
+cp "$cert_file" "$bundle_file"
+ok "Certificate bundle saved: $bundle_file"
+
+root_ca_path="$OUTPUT_DIR/root_ca.crt"
+if [[ ! -f "$root_ca_path" ]]; then
+    info "Exporting Root CA certificate..."
+    if vault read -field=certificate pki/cert/ca > "$root_ca_path"; then
+        ok "Root CA exported to: $root_ca_path"
+    else
+        warn "Could not export Root CA"
+    fi
+fi
+
+echo ""
+echo "============================================================"
+ok "Certificate generated successfully!"
+echo "============================================================"
+echo ""
+echo "Files created:"
+echo "  Certificate:    $cert_file"
+echo "  Private Key:    $key_file"
+echo "  CA Chain:       $ca_chain_file"
+echo "  Bundle:         $bundle_file"
+echo ""
+info "Serial Number: $serial_number"
+info "Expiration: $expiration"

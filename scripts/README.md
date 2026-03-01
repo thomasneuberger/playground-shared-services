@@ -25,6 +25,11 @@ The platform now uses **HashiCorp Vault PKI Engine** (not Step CA).
 ./generate-certs-vault.sh -d myapp.local
 ```
 
+Oder mit PowerShell-kompatiblen Parametern:
+```bash
+./generate-certs-vault.sh -Domain myapp.local
+```
+
 ### Generate a Client Certificate
 
 **Windows:**

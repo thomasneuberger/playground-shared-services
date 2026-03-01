@@ -69,13 +69,15 @@ services:
     image: rabbitmq:3.13-management-alpine
     container_name: shared-rabbitmq
     ports:
-      - "5672:5672"      # AMQP
-      - "15672:15672"    # Management UI
+      - "5671:5671"      # AMQPS (TLS)
+      - "15671:15671"    # Management UI HTTPS
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
+      - ./config/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - ./certs:/etc/rabbitmq/certs:ro
     networks:
       - shared-services
     restart: unless-stopped

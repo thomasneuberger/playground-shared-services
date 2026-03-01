@@ -5,7 +5,7 @@ Ein vollständiges Docker Compose Setup mit Open-Source Komponenten für ein Sha
 ## 🚀 Komponenten
 
 - **Keycloak** (Port 8082) - OpenID Connect / OAuth2 / SAML Authentifizierung
-- **RabbitMQ** (5672, 15672) - Message Queue mit Management UI
+- **RabbitMQ** (5671, 15671) - Message Queue mit TLS + HTTPS Management UI
 - **Vault** (8201) - Secret Store & PKI Engine für SSL/TLS Zertifikate
 - **Prometheus** (9090) - Metriken-Erfassung
 - **Loki** (3100) - Log-Aggregation
@@ -78,7 +78,7 @@ docker compose ps --format "table {{.Service}}\t{{.State}}\t{{.Status}}"
 | **Keycloak** | http://localhost:8082 | admin / (siehe .env) |
 | **Grafana** | http://localhost:3000 | admin / (siehe .env) |
 | **Prometheus** | http://localhost:9090 | - |
-| **RabbitMQ UI** | http://localhost:15672 | guest / guest |
+| **RabbitMQ UI** | https://rabbit.local:15671 | guest / guest |
 | **Vault** | http://localhost:8201 | Token: (siehe .env) |
 | **Loki** | http://localhost:3100 | - |
 | **Tempo** | http://localhost:3200 | - |
@@ -191,7 +191,7 @@ Siehe [PKI_SETUP_VAULT.md](PKI_SETUP_VAULT.md) für detaillierte Dokumentation.
 
 ## �📨 RabbitMQ Setup
 
-1. Öffne http://localhost:15672
+1. Öffne https://rabbit.local:15671
 2. Login: guest / guest
 3. Queues und Topics erstellen unter dem Punkt "Queues"
 
@@ -266,7 +266,7 @@ Ersetze `localhost` mit deinem Hostname:
 
 - **Keycloak**: `http://<HOST_NAME>:8082/admin`
 - **Grafana**: `http://<HOST_NAME>:3000`
-- **RabbitMQ**: `http://<HOST_NAME>:15672`
+- **RabbitMQ**: `https://rabbit.local:15671`
 - **Vault**: `http://<HOST_NAME>:8201`
 
 ### 4. Keycloak Redirect URIs anpassen
@@ -293,8 +293,8 @@ In deinen App-Konfigurationen:
 
 Stelle sicher, dass folgende Ports auf deinem NAS erreichbar sind:
 - 3000 (Grafana), 8082 (Keycloak), 8201 (Vault)
-- 9001 (Step CA), 15672 (RabbitMQ UI)
-- 5672 (RabbitMQ AMQP) für App-Zugriff
+- 15671 (RabbitMQ UI HTTPS)
+- 5671 (RabbitMQ AMQPS) für App-Zugriff
 
 ## �🔧 Troubleshooting
 
