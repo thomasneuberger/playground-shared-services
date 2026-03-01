@@ -491,18 +491,6 @@ keycloak-2:
     KC_CACHE: infinispan
   command: [start]
 
-# Nginx als Reverse Proxy / Load Balancer
-nginx:
-  image: nginx:latest
-  ports:
-    - "8080:8080"
-  volumes:
-    - ./nginx.conf:/etc/nginx/nginx.conf:ro
-  depends_on:
-    - keycloak-1
-    - keycloak-2
-```
-
 ## 🔍 Troubleshooting
 
 ### Problem: Connection refused

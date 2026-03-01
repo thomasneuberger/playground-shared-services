@@ -85,6 +85,9 @@ docker compose exec vault vault secrets list
 .\scripts\generate-certs-vault.ps1 -ExportRootCA
 ```
 
+**💡 Hinweis**: Die generierten `.crt` Dateien enthalten automatisch die komplette Zertifikat-Chain (Leaf + Root CA), 
+so dass Server-Anwendungen die Chain direkt an Clients übermitteln können.
+
 ### Option 2: Bash Script (Linux/macOS)
 
 ```bash

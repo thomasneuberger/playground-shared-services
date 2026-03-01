@@ -424,7 +424,7 @@ IdentityServer wurde durch Keycloak ersetzt. Siehe [Keycloak Integration](#-keyc
 
 ---
 
-## � HTTPS und Zertifikate (Step CA)
+## 🔐 HTTPS und Zertifikate (Vault PKI)
 
 ### Installation
 
@@ -432,7 +432,7 @@ IdentityServer wurde durch Keycloak ersetzt. Siehe [Keycloak Integration](#-keyc
 dotnet add package System.Security.Cryptography.X509Certificates
 ```
 
-### HTTPS Server mit Step CA Zertifikat
+### HTTPS Server mit Vault PKI Zertifikat
 
 ```csharp
 // Program.cs
@@ -440,7 +440,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.WebHost.ConfigureKestrel((context, options) =>
 {
-    // HTTPS mit Zertifikat von Step CA
+    // HTTPS mit Zertifikat von Vault PKI
     options.ListenAnyIP(5001, listenOptions =>
     {
         listenOptions.UseHttps(
@@ -460,11 +460,11 @@ var app = builder.Build();
 app.Run();
 ```
 
-### Certificate automatisch aus Vault/Step CA laden
+### Certificate automatisch aus Vault PKI laden
 
 ```csharp
 // Extensions/CertificateExtensions.cs
-public static IWebHostBuilder UseCustomCertificate(
+public static IWebHostBuilder UseVaultPkiCertificate(
     this IWebHostBuilder webHost)
 {
     return webHost.ConfigureKestrel((context, options) =>
@@ -483,7 +483,7 @@ public static IWebHostBuilder UseCustomCertificate(
 }
 
 // Program.cs
-builder.WebHost.UseCustomCertificate();
+builder.WebHost.UseVaultPkiCertificate();
 ```
 
 ---

@@ -3,11 +3,25 @@
 
 set -e
 
+# Function to read token from .env file
+get_vault_token_from_env() {
+    if [ -f ".env" ]; then
+        # Read VAULT_TOKEN from .env file
+        local token=$(grep "^VAULT_TOKEN=" .env | cut -d '=' -f2-)
+        if [ -n "$token" ]; then
+            echo "$token"
+            return 0
+        fi
+    fi
+    return 1
+}
+
 # Default values
 VAULT_ADDR="${VAULT_ADDR:-http://localhost:8201}"
-VAULT_TOKEN="${VAULT_TOKEN:-myroot123}"
+# VAULT_TOKEN will be determined later with priority: param > env > .env > default
 OUTPUT_DIR="./certs"
 ROLE="server-cert"
+TOKEN_FROM_PARAM=""
 
 # Color output
 RED='\033[0;31m'
@@ -34,7 +48,7 @@ OPTIONS:
     -i, --ip-sans IPS            Comma-separated IP addresses for SANs
     -r, --role ROLE              Vault PKI role (server-cert, client-cert, service-cert)
     -a, --vault-addr ADDR        Vault address (default: http://localhost:8201)
-    -t, --vault-token TOKEN      Vault token (default: \$VAULT_TOKEN or myroot123)
+    -t, --vault-token TOKEN      Vault token (default: from parameter > \$VAULT_TOKEN > .env file > myroot123)
     -o, --output-dir DIR         Output directory (default: ./certs)
     --root-ca                    Export root CA certificate only
     -h, --help                   Show this help message
@@ -88,7 +102,7 @@ while [[ $# -gt 0 ]]; do
             shift 2
             ;;
         -t|--vault-token)
-            VAULT_TOKEN="$2"
+            TOKEN_FROM_PARAM="$2"
             shift 2
             ;;
         -o|--output-dir)
@@ -116,6 +130,23 @@ echo "============================================================"
 echo "   Vault PKI Certificate Generator"
 echo "============================================================"
 echo ""
+
+# Determine Vault token (priority: parameter > env var > .env file > default)
+if [ -n "$TOKEN_FROM_PARAM" ]; then
+    VAULT_TOKEN="$TOKEN_FROM_PARAM"
+    info "Using provided Vault token"
+elif [ -n "$VAULT_TOKEN" ]; then
+    info "Using Vault token from environment variable"
+else
+    # Try to read from .env file
+    if token_from_file=$(get_vault_token_from_env); then
+        VAULT_TOKEN="$token_from_file"
+        info "Using Vault token from .env file"
+    else
+        VAULT_TOKEN="myroot123"
+        warning "No VAULT_TOKEN found, using default: myroot123"
+    fi
+fi
 
 # Set Vault environment
 export VAULT_ADDR
@@ -214,10 +245,13 @@ if RESULT=$($VAULT_CMD 2>&1); then
         SERIAL=$(echo "$RESULT" | grep -o '"serial_number":"[^"]*"' | cut -d'"' -f4)
     fi
     
-    # Save files
+    # Save certificate with CA chain
     echo "$CERTIFICATE" > "${CERT_PATH}.crt"
-    success "Certificate saved: ${CERT_PATH}.crt"
-    
+    if [ -n "$CA_CHAIN" ]; then
+        echo "$CA_CHAIN" >> "${CERT_PATH}.crt"
+    fi
+    success "Certificate with CA chain saved: ${CERT_PATH}.crt"
+
     echo "$PRIVATE_KEY" > "${CERT_PATH}.key"
     chmod 600 "${CERT_PATH}.key"
     success "Private key saved: ${CERT_PATH}.key"

@@ -23,7 +23,7 @@
     Vault address (default: http://localhost:8201)
 
 .PARAMETER VaultToken
-    Vault token for authentication (default: from $env:VAULT_TOKEN or myroot123)
+    Vault token for authentication (default: from parameter > $env:VAULT_TOKEN > .env file > myroot123)
 
 .PARAMETER OutputDir
     Output directory for certificates (default: ./certs)
@@ -81,6 +81,20 @@ function Write-Success { param([string]$Message) Write-Host "[OK]    $Message" -
 function Write-Warning { param([string]$Message) Write-Host "[WARN]  $Message" -ForegroundColor Yellow }
 function Write-Error { param([string]$Message) Write-Host "[ERROR] $Message" -ForegroundColor Red }
 
+# Function to read token from .env file
+function Get-VaultTokenFromEnv {
+    $envFile = ".env"
+    if (Test-Path $envFile) {
+        $envContent = Get-Content $envFile
+        foreach ($line in $envContent) {
+            if ($line -match '^VAULT_TOKEN=(.+)$') {
+                return $matches[1].Trim()
+            }
+        }
+    }
+    return $null
+}
+
 # Banner
 Write-Host ""
 Write-Host "=" * 60 -ForegroundColor Cyan
@@ -90,11 +104,23 @@ Write-Host ""
 
 # Set Vault environment variables
 $env:VAULT_ADDR = $VaultAddr
+
+# Determine Vault token (priority: parameter > env var > .env file > default)
 if ($VaultToken) {
     $env:VAULT_TOKEN = $VaultToken
-} elseif (-not $env:VAULT_TOKEN) {
-    $env:VAULT_TOKEN = "myroot123"
-    Write-Warning "No VAULT_TOKEN provided, using default: myroot123"
+    Write-Info "Using provided Vault token"
+} elseif ($env:VAULT_TOKEN) {
+    Write-Info "Using Vault token from environment variable"
+} else {
+    # Try to read from .env file
+    $tokenFromFile = Get-VaultTokenFromEnv
+    if ($tokenFromFile) {
+        $env:VAULT_TOKEN = $tokenFromFile
+        Write-Info "Using Vault token from .env file"
+    } else {
+        $env:VAULT_TOKEN = "myroot123"
+        Write-Warning "No VAULT_TOKEN found, using default: myroot123"
+    }
 }
 
 # Check if vault CLI is available
@@ -116,9 +142,18 @@ if ($ExportRootCA) {
     Write-Info "Exporting Root CA certificate..."
     
     try {
-        $rootCa = vault read -field=certificate pki/cert/ca
+        $rootCaJson = vault read -format=json pki/cert/ca 2>&1 | Out-String
+        
+        if ($LASTEXITCODE -ne 0) {
+            Write-Error "Failed to read root CA from Vault: $rootCaJson"
+            exit 1
+        }
+        
+        $rootCaObject = $rootCaJson | ConvertFrom-Json
+        $rootCaCert = $rootCaObject.data.certificate
         $rootCaPath = Join-Path $OutputDir "root_ca.crt"
-        $rootCa | Out-File -FilePath $rootCaPath -Encoding ASCII
+        
+        $rootCaCert | Out-File -FilePath $rootCaPath -Encoding UTF8 -NoNewline
         
         Write-Success "Root CA exported to: $rootCaPath"
         Write-Host ""
@@ -189,10 +224,11 @@ try {
     $json = $result | ConvertFrom-Json
     $certData = $json.data
     
-    # Save certificate
+    # Save certificate with CA chain
     $certFile = "$certPath.crt"
-    $certData.certificate | Out-File -FilePath $certFile -Encoding ASCII
-    Write-Success "Certificate saved: $certFile"
+    $certContent = @($certData.certificate) + $certData.ca_chain
+    $certContent -join "`n" | Out-File -FilePath $certFile -Encoding ASCII
+    Write-Success "Certificate with CA chain saved: $certFile"
     
     # Save private key
     $keyFile = "$certPath.key"
@@ -230,9 +266,15 @@ try {
     $rootCaPath = Join-Path $OutputDir "root_ca.crt"
     if (-not (Test-Path $rootCaPath)) {
         Write-Info "Exporting Root CA certificate..."
-        $rootCa = vault read -field=certificate pki/cert/ca
-        $rootCa | Out-File -FilePath $rootCaPath -Encoding ASCII
-        Write-Success "Root CA exported to: $rootCaPath"
+        try {
+            $rootCaJson = vault read -format=json pki/cert/ca 2>&1 | Out-String
+            $rootCaObject = $rootCaJson | ConvertFrom-Json
+            $rootCaCert = $rootCaObject.data.certificate
+            $rootCaCert | Out-File -FilePath $rootCaPath -Encoding UTF8 -NoNewline
+            Write-Success "Root CA exported to: $rootCaPath"
+        } catch {
+            Write-Warning "Could not export Root CA: $_"
+        }
     }
     
     Write-Host ""

@@ -1,0 +1,25 @@
+# Traefik Static Configuration for Vault HTTPS
+api:
+  dashboard: true
+  insecure: true  # Only for local development!
+
+providers:
+  docker:
+    exposedByDefault: false
+    network: shared-services
+  file:
+    filename: /etc/traefik/dynamic.yml
+    watch: true
+
+entryPoints:
+  web:
+    address: ":80"
+  websecure:
+    address: ":443"
+
+log:
+  level: INFO
+
+# Access logs for debugging (optional)
+# accessLog:
+#   filePath: "/var/log/traefik/access.log"

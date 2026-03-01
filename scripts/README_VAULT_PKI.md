@@ -80,12 +80,14 @@ Generiert Zertifikate über Vault PKI Engine mit umfangreichen Optionen.
 
 ```
 certs/
-  ├── myapp.local.crt              # Server-Zertifikat
+  ├── myapp.local.crt              # Server-Zertifikat mit CA Chain (für Server-TLS)
   ├── myapp.local.key              # Private Key
-  ├── myapp.local-ca-chain.crt     # CA Chain
+  ├── myapp.local-ca-chain.crt     # CA Chain (separat)
   ├── myapp.local-bundle.crt       # Komplettes Bundle (cert + chain)
-  └── root_ca.crt                  # Root CA (für Trust)
+  └── root_ca.crt                  # Root CA (für Client-seitige Verifikation)
 ```
+
+**Wichtig**: Die `.crt` Datei enthält jetzt automatisch die komplette Zertifikat-Chain (Leaf + Root CA), so dass Server-Anwendungen (wie Traefik, Nginx, Vault) die Chain direkt an Clients übermitteln können. Das ermöglicht es Browsern, die Zertifikat-Vertrauenskette zu verifizieren.
 
 #### Beispiel-Output
 
@@ -98,7 +100,7 @@ certs/
 [INFO]  Certificate Name: myapp.local
 
 [INFO]  Generating certificate from Vault PKI...
-[OK]    Certificate saved: ./certs/myapp.local.crt
+[OK]    Certificate with CA chain saved: ./certs/myapp.local.crt
 [OK]    Private key saved: ./certs/myapp.local.key
 [OK]    CA chain saved: ./certs/myapp.local-ca-chain.crt
 [OK]    Certificate bundle saved: ./certs/myapp.local-bundle.crt
@@ -108,7 +110,7 @@ certs/
 ============================================================
 
 Files created:
-  Certificate:    ./certs/myapp.local.crt
+  Certificate:    ./certs/myapp.local.crt (mit CA Chain)
   Private Key:    ./certs/myapp.local.key
   CA Chain:       ./certs/myapp.local-ca-chain.crt
   Bundle:         ./certs/myapp.local-bundle.crt
@@ -117,12 +119,15 @@ Files created:
 [INFO]  Expiration: 1735689600
 
 Next steps:
-  1. Trust the Root CA:
+  1. Trust the Root CA on your system:
      certutil -addstore -f "ROOT" ".\certs\root_ca.crt"
 
-  2. Use in your application:
-     Certificate: ./certs/myapp.local.crt
+  2. Use in your application/server:
+     Certificate: ./certs/myapp.local.crt (enthält bereits die CA Chain!)
      Private Key: ./certs/myapp.local.key
+     
+  3. Reload/Restart die Server-Anwendung (z.B. Traefik, Nginx, Vault)
+     damit sie das neue Zertifikat mit Chain lädt
 ```
 
 ---
@@ -390,7 +395,51 @@ docker compose up -d vault-pki-init
 
 ---
 
-## 📚 Weiterführende Links
+## � Certificate Chain - Wichtig für Server-TLS
+
+Seit der letzten Aktualisierung enthalten die generierten `.crt` Dateien automatisch die komplette Zertifikat-Chain:
+
+```
+myapp.local.crt = [Leaf Certificate] + [Root CA Certificate]
+```
+
+Dies ist **kritisch wichtig** für Server-Anwendungen (Traefik, Nginx, Apache, Vault, etc.):
+
+- **Ohne Chain**: Browser können die Vertrauenskette nicht verifizieren → SSL-Fehler
+- **Mit Chain**: Browser erhalten die komplette Chain vom Server → Verifikation funktioniert ✓
+
+### Beispiel-Szenario: Traefik + Vault
+
+**Bevor der Fix:**
+1. Genarier: `myapp.local.crt` (nur Leaf)
+2. Traefik lädt: `myapp.local.crt` (nur Leaf)
+3. Browser: "Root CA not found" → ❌ Fehler
+
+**Nach dem Fix:**
+1. Genarier: `myapp.local.crt` (Leaf + Root CA)
+2. Traefik lädt: `myapp.local.crt` (Leaf + Root CA)
+3. Browser: Empfängt komplette Chain → ✓ Verifikation OK
+
+### Verifizierung der Chain
+
+Um zu prüfen, dass deine `.crt` Datei die Chain enthält:
+
+```powershell
+# PowerShell - Chain anzeigen
+$cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2("./certs/myapp.local.crt")
+$chain = New-Object System.Security.Cryptography.X509Certificates.X509Chain
+$chain.Build($cert)
+$chain.ChainElements | Select-Object Certificate | Format-Table -AutoSize
+```
+
+```bash
+# Bash - Zei Count der PEM-Blöcke (sollte >1 sein)
+grep -c "BEGIN CERTIFICATE" ./certs/myapp.local.crt  # Sollte: 2 (oder mehr)
+```
+
+---
+
+## �📚 Weiterführende Links
 
 - [PKI_SETUP_VAULT.md](../PKI_SETUP_VAULT.md) - Detaillierte PKI Dokumentation
 - [VAULT_PKI_MIGRATION.md](../VAULT_PKI_MIGRATION.md) - Migration von Step CA

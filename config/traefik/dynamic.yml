@@ -1,0 +1,25 @@
+# Traefik Dynamic Configuration - TLS Certificates
+http:
+  routers:
+    vault:
+      rule: "Host(`vault.local`) || Host(`localhost`)"
+      entryPoints:
+        - websecure
+      service: vault-service
+      tls: {}
+  
+  services:
+    vault-service:
+      loadBalancer:
+        servers:
+          - url: "http://vault:8200"
+
+tls:
+  certificates:
+    - certFile: /certs/vault.local.crt
+      keyFile: /certs/vault.local.key
+  stores:
+    default:
+      defaultCertificate:
+        certFile: /certs/vault.local.crt
+        keyFile: /certs/vault.local.key

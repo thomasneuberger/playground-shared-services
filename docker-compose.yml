@@ -74,18 +74,17 @@ services:
     image: hashicorp/vault:latest
     container_name: shared-vault
     ports:
-      - "8201:8200"
+      - "8201:8201"
     environment:
       VAULT_DEV_ROOT_TOKEN_ID: ${VAULT_TOKEN:-myroot123}
-      VAULT_DEV_LISTEN_ADDRESS: "0.0.0.0:8200"
-      VAULT_ADDR: "http://127.0.0.1:8200"
+      VAULT_DEV_LISTEN_ADDRESS: "0.0.0.0:8201"
+      VAULT_ADDR: "http://127.0.0.1:8201"
     cap_add:
       - IPC_LOCK
     volumes:
       - vault-data:/vault/data
       - vault-logs:/vault/logs
       - ./certs:/vault/certs
-      - ./config/vault:/vault/config:ro
     networks:
       - shared-services
     restart: unless-stopped
@@ -96,13 +95,20 @@ services:
       timeout: 10s
       retries: 5
       start_period: 20s
+    labels:
+      # Traefik configuration for HTTPS access
+      - "traefik.enable=true"
+      - "traefik.http.routers.vault.rule=Host(`vault.local`) || Host(`localhost`) || Host(`${HOST_NAME:-localhost}`)"
+      - "traefik.http.routers.vault.entrypoints=websecure"
+      - "traefik.http.routers.vault.tls=true"
+      - "traefik.http.services.vault.loadbalancer.server.port=8201"
 
   # Vault PKI Initialization
   vault-pki-init:
     image: hashicorp/vault:latest
     container_name: shared-vault-pki-init
     environment:
-      VAULT_ADDR: "http://vault:8200"
+      VAULT_ADDR: "http://vault.local:8201"
       VAULT_TOKEN: ${VAULT_TOKEN:-myroot123}
       PKI_COMMON_NAME: ${PKI_COMMON_NAME:-Shared Services CA}
       PKI_ORG: ${PKI_ORG:-Shared Services}
@@ -116,6 +122,44 @@ services:
       vault:
         condition: service_healthy
     entrypoint: ["/bin/sh", "/vault/init-pki.sh"]
+
+  # === TRAEFIK REVERSE PROXY (HTTPS for Vault) ===
+  traefik:
+    image: traefik:v2.11
+    container_name: shared-traefik
+    ports:
+      - "8443:443"      # HTTPS for Vault UI
+      - "8088:8080"     # Traefik Dashboard
+    command:
+      # Docker provider
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=shared-services"
+      # File provider for TLS certificates
+      - "--providers.file.filename=/etc/traefik/dynamic.yml"
+      - "--providers.file.watch=true"
+      # Entry points
+      - "--entrypoints.websecure.address=:443"
+      # Dashboard
+      - "--api.dashboard=true"
+      - "--api.insecure=true"
+      # Logging
+      - "--log.level=INFO"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - ./config/traefik:/etc/traefik:ro
+      - ./certs:/certs:ro
+    networks:
+      - shared-services
+    depends_on:
+      - vault
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      # Dashboard routing
+      - "traefik.http.routers.dashboard.rule=Host(`traefik.local`) || PathPrefix(`/dashboard`) || PathPrefix(`/api`)"
+      - "traefik.http.routers.dashboard.service=api@internal"
+      - "traefik.http.routers.dashboard.entrypoints=websecure"
 
   # === OBSERVABILITY: PROMETHEUS ===
   prometheus:

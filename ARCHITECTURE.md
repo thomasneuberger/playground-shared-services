@@ -51,8 +51,8 @@
 │  │  │                                                  │             │ │
 │  │  │  ┌────────────────────────────────────────────┐ │             │ │
 │  │  │  │                                            │ │             │ │
-│  │  │  │  Step CA (Smallstep)                      │ │             │ │
-│  │  │  │  Certificate Authority (Port 9000)        │ │             │ │
+│  │  │  │  Vault PKI Engine                         │ │             │ │
+│  │  │  │  Certificate Authority (Port 8201)        │ │             │ │
 │  │  │  │                                            │ │             │ │
 │  │  │  │  ┌──────────────┐  ┌──────────────────┐  │ │             │ │
 │  │  │  │  │ Root CA      │  │ Intermediate CA  │  │ │             │ │
@@ -61,7 +61,7 @@
 │  │  │  │                                            │ │             │ │
 │  │  │  └────────────────────────────────────────────┘ │             │ │
 │  │  │                                                  │             │ │
-│  │  │  Server Certs: DigitalSignatures, TLS/HTTPS    │             │ │
+│  │  │  Server Certs: HTTPS/TLS                       │             │ │
 │  │  │  Client Certs: mTLS, Service-to-Service        │             │ │
 │  │  │                                                  │             │ │
 │  │  └──────────────────────────────────────────────────┘             │ │
@@ -195,12 +195,12 @@
 ┌────────────────────────────────────────────────────────────────┐
 │                  Certificate Lifecycle                          │
 │                                                                 │
-│  Client Request                                                │
+│  Script Request (generate-certs-vault.ps1/sh)                  │
 │  └─────────────────────────┐                                   │
 │                            │                                   │
 │                            ▼                                   │
 │  ┌─────────────────────────────────────┐                      │
-│  │  Step CA                            │                      │
+│  │  Vault PKI Engine                   │                      │
 │  │                                     │                      │
 │  │  Validate Request                   │                      │
 │  │  └──────────────────────────────────┘                      │
@@ -308,7 +308,8 @@
 | Keycloak | 8080 | HTTP | OpenID Connect/OAuth2/SAML Server |
 | RabbitMQ AMQP | 5672 | TCP | Message Broker |
 | RabbitMQ UI | 15672 | HTTP | Management Console |
-| Vault | 8200 | HTTP | Secret Management & PKI |
+| Vault | 8201 | HTTP | Secret Management & PKI |
+| Traefik HTTPS | 8443 | HTTPS | Reverse Proxy (HTTPS for Vault UI) |
 | Prometheus | 9090 | HTTP | Metrics DB |
 | Loki | 3100 | HTTP | Log Aggregation |
 | Tempo | 3200 | HTTP | Tracing Backend |
