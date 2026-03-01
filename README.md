@@ -7,10 +7,10 @@ Ein vollständiges Docker Compose Setup mit Open-Source Komponenten für ein Sha
 - **Keycloak** (Port 8082) - OpenID Connect / OAuth2 / SAML Authentifizierung
 - **RabbitMQ** (5671, 15671) - Message Queue mit TLS + HTTPS Management UI
 - **Vault** (8201) - Secret Store & PKI Engine für SSL/TLS Zertifikate
-- **Prometheus** (9090) - Metriken-Erfassung
-- **Loki** (3100) - Log-Aggregation
-- **Tempo** (3200) - Distributed Tracing (OpenTelemetry)
-- **Grafana** (3000) - Observability Dashboard
+- **Prometheus** (HTTPS only) - Metriken-Erfassung
+- **Loki** (HTTPS only) - Log-Aggregation
+- **Tempo** (HTTPS only, OTLP: 4317, 4318) - Distributed Tracing (OpenTelemetry)
+- **Grafana** (HTTPS only) - Observability Dashboard
 - **PostgreSQL** - Datenbank für Keycloak
 
 ## 📋 Voraussetzungen
@@ -76,22 +76,44 @@ docker compose ps --format "table {{.Service}}\t{{.State}}\t{{.Status}}"
 | Service | URL | Credentials |
 |---------|-----|-------------|
 | **Keycloak** | http://localhost:8082 | admin / (siehe .env) |
-| **Grafana** | http://localhost:3000 | admin / (siehe .env) |
-| **Prometheus** | http://localhost:9090 | - |
-| **RabbitMQ UI** | https://rabbit.local:15671 | guest / guest |
-| **Vault** | http://localhost:8201 | Token: (siehe .env) |
-| **Loki** | http://localhost:3100 | - |
-| **Tempo** | http://localhost:3200 | - |
+| **Keycloak (HTTPS)** | https://keycloak.local:8443 | admin / (siehe .env) |
+| **Grafana** | https://grafana.local:8443 | admin / (siehe .env) |
+| **Prometheus** | https://prometheus.local:8443 | - |
+| **Loki** | https://loki.local:8443 | - |
+| **Tempo** | https://tempo.local:8443 | - |
 
 ## 📊 Grafana Setup (beim ersten Start)
 
-1. Öffne http://localhost:3000
+1. Öffne https://grafana.local:8443
 2. Login mit Admin-Benutzer
 3. Datasources sind bereits vorbereitet:
    - Prometheus (Metriken)
    - Loki (Logs)
    - Tempo (Traces)
 4. Erstelle ein Dashboard oder führe Queries aus
+
+### HTTPS-Konfiguration für Grafana (Traefik TLS Termination)
+
+Grafana ist über HTTPS via Traefik mit Vault PKI Zertifikaten konfiguriert:
+
+📖 **[GRAFANA_VAULT_HTTPS.md](./GRAFANA_VAULT_HTTPS.md)** - Vollständige Anleitung zur HTTPS-Konfiguration
+
+Quick Start:
+```powershell
+# Zertifikat von Vault PKI generieren
+.\scripts\generate-certs-vault.ps1 -Domain "grafana.local"
+
+# Services neu starten (Traefik lädt das Zertifikat automatisch)
+docker compose up -d
+```
+
+Dann über HTTPS zugreifen:
+- https://grafana.local:8443
+
+**Hinweis:** `grafana.local` muss in deiner `/etc/hosts` (Linux/macOS) oder `C:\Windows\System32\drivers\etc\hosts` (Windows) eingetragen sein:
+```
+127.0.0.1  grafana.local
+```
 
 ## 🔐 Vault Setup (Initial)
 
@@ -199,22 +221,72 @@ Siehe [PKI_SETUP_VAULT.md](PKI_SETUP_VAULT.md) für detaillierte Dokumentation.
 
 ### Prometheus Metrics sammeln
 
-```bash
-# Prometheus selbst monitoren
-curl http://localhost:9090/api/v1/query?query=up
+Prometheus ist über HTTPS via Traefik verfügbar:
+
+📚 **[PROMETHEUS_VAULT_HTTPS.md](./PROMETHEUS_VAULT_HTTPS.md)** - Vollständige Anleitung zur HTTPS-Konfiguration
+
+Quick Start:
+```powershell
+# Zertifikat von Vault PKI generieren
+.\scripts\generate-certs-vault.ps1 -Domain "prometheus.local"
+
+# Services neu starten
+docker compose up -d
 ```
+
+Zugriff:
+- **Web UI:** https://prometheus.local:8443
+- **API:** `curl -k "https://prometheus.local:8443/api/v1/query?query=up"`
 
 ### Loki Logs durchsuchen
 
+Loki ist über HTTPS via Traefik verfügbar:
+
+📚 **[LOKI_VAULT_HTTPS.md](./LOKI_VAULT_HTTPS.md)** - Vollständige Anleitung zur HTTPS-Konfiguration
+
+Quick Start:
+```powershell
+# Zertifikat von Vault PKI generieren
+.\scripts\generate-certs-vault.ps1 -Domain "loki.local"
+
+# Services neu starten
+docker compose up -d
+```
+
+Zugriff:
+- **Web UI:** Über Grafana Explore (https://grafana.local:8443) - Loki hat keine eigene Web UI
+- **API (Ready Check):** `curl -k "https://loki.local:8443/ready"` (Hinweis: Während der ersten ~15s nach Start zeigt Loki "Ingester not ready" - das ist normal)
+- **API (Query):** `curl -k "https://loki.local:8443/loki/api/v1/query_range" --data-urlencode 'query={job="varlogs"}'`
+
+**Alternative (interne Abfrage für Legacy-Zwecke):**
 ```bash
-# Logs via Grafana Explorer oder direkter Loki Query:
+# Logs via direkter Loki Query (nicht über Traefik):
 curl -G -s "http://localhost:3100/loki/api/v1/query_range" \
   --data-urlencode 'query={job="prometheus"}' | jq .
 ```
 
 ### Tempo Traces
 
-Über Grafana → Explore → Tempo
+Tempo ist über HTTPS via Traefik verfügbar:
+
+📚 **[TEMPO_VAULT_HTTPS.md](./TEMPO_VAULT_HTTPS.md)** - Vollständige Anleitung zur HTTPS-Konfiguration
+
+Quick Start:
+```powershell
+# Zertifikat von Vault PKI generieren
+.\scripts\generate-certs-vault.ps1 -Domain "tempo.local"
+
+# Services neu starten
+docker compose up -d
+```
+
+Zugriff:
+- **Web UI:** https://tempo.local:8443 (Status/Metriken - für vollständige UI nutze Grafana Explore)
+- **Via Grafana:** https://grafana.local:8443 → Explore → Tempo
+- **OTLP Receivers (für Apps - TLS-gesichert):** 
+  - gRPC: `https://localhost:4317` oder `https://tempo:4317` (intern)
+  - HTTP: `https://localhost:4318` oder `https://tempo:4318` (intern)
+  - **Wichtig:** Apps müssen Root CA vertrauen (siehe TEMPO_VAULT_HTTPS.md)
 
 ## 🛑 Services stoppen / neustarten
 
@@ -265,7 +337,10 @@ docker compose up -d
 Ersetze `localhost` mit deinem Hostname:
 
 - **Keycloak**: `http://<HOST_NAME>:8082/admin`
-- **Grafana**: `http://<HOST_NAME>:3000`
+- **Grafana**: `https://grafana.local:8443` (via Traefik HTTPS)
+- **Prometheus**: `https://prometheus.local:8443` (via Traefik HTTPS)
+- **Loki**: `https://loki.local:8443` (via Traefik HTTPS)
+- **Tempo**: `https://tempo.local:8443` (via Traefik HTTPS)
 - **RabbitMQ**: `https://rabbit.local:15671`
 - **Vault**: `http://<HOST_NAME>:8201`
 
@@ -292,9 +367,11 @@ In deinen App-Konfigurationen:
 ### 6. Firewall / Netzwerk
 
 Stelle sicher, dass folgende Ports auf deinem NAS erreichbar sind:
-- 3000 (Grafana), 8082 (Keycloak), 8201 (Vault)
+- 8082 (Keycloak), 8201 (Vault)
+- 8443 (Traefik HTTPS - für Grafana, Keycloak, Prometheus, Loki, Tempo)
 - 15671 (RabbitMQ UI HTTPS)
 - 5671 (RabbitMQ AMQPS) für App-Zugriff
+- 4317, 4318 (Tempo OTLP Receivers) für Trace-Ingestion
 
 ## �🔧 Troubleshooting
 
@@ -315,7 +392,7 @@ docker compose up -d --build
 
 ```yaml
 ports:
-  - "3001:3000"  # Grafana auf Port 3001 statt 3000
+  - "8083:8080"  # Keycloak auf Port 8083 statt 8082
 ```
 
 ### Vault lädt nicht
@@ -384,7 +461,9 @@ builder.Services.AddOpenTelemetry()
         .AddAspNetCoreInstrumentation()
         .AddOtlpExporter(opt => 
         {
-            opt.Endpoint = new Uri("http://localhost:4317");
+            opt.Endpoint = new Uri("https://localhost:4317");
+            // Für Development: Self-signed Cert akzeptieren
+            // Für Production: Root CA vertrauen (siehe TEMPO_VAULT_HTTPS.md)
         }))
     .WithMetrics(metrics => metrics
         .AddAspNetCoreInstrumentation()

@@ -16,6 +16,38 @@ http:
       service: keycloak-service
       tls:
         certResolver: keycloak-cert
+    
+    grafana:
+      rule: "Host(`grafana.local`)"
+      entryPoints:
+        - websecure
+      service: grafana-service
+      tls:
+        certResolver: grafana-cert
+    
+    prometheus:
+      rule: "Host(`prometheus.local`)"
+      entryPoints:
+        - websecure
+      service: prometheus-service
+      tls:
+        certResolver: prometheus-cert
+    
+    loki:
+      rule: "Host(`loki.local`)"
+      entryPoints:
+        - websecure
+      service: loki-service
+      tls:
+        certResolver: loki-cert
+    
+    tempo:
+      rule: "Host(`tempo.local`)"
+      entryPoints:
+        - websecure
+      service: tempo-service
+      tls:
+        certResolver: tempo-cert
   
   services:
     vault-service:
@@ -27,6 +59,26 @@ http:
       loadBalancer:
         servers:
           - url: "http://keycloak:8080"
+    
+    grafana-service:
+      loadBalancer:
+        servers:
+          - url: "http://grafana:3000"
+    
+    prometheus-service:
+      loadBalancer:
+        servers:
+          - url: "http://prometheus:9090"
+    
+    loki-service:
+      loadBalancer:
+        servers:
+          - url: "http://loki:3100"
+    
+    tempo-service:
+      loadBalancer:
+        servers:
+          - url: "http://tempo:3200"
 
 tls:
   certificates:
@@ -34,3 +86,11 @@ tls:
       keyFile: /certs/vault.local.key
     - certFile: /certs/keycloak.local.crt
       keyFile: /certs/keycloak.local.key
+    - certFile: /certs/grafana.local.crt
+      keyFile: /certs/grafana.local.key
+    - certFile: /certs/prometheus.local.crt
+      keyFile: /certs/prometheus.local.key
+    - certFile: /certs/loki.local.crt
+      keyFile: /certs/loki.local.key
+    - certFile: /certs/tempo.local.crt
+      keyFile: /certs/tempo.local.key

@@ -7,8 +7,14 @@ distributor:
       protocols:
         grpc:
           endpoint: 0.0.0.0:4317
+          tls:
+            cert_file: /certs/tempo.local.crt
+            key_file: /certs/tempo.local.key
         http:
           endpoint: 0.0.0.0:4318
+          tls:
+            cert_file: /certs/tempo.local.crt
+            key_file: /certs/tempo.local.key
     jaeger:
       protocols:
         thrift_http:

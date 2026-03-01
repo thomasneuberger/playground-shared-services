@@ -183,8 +183,6 @@ services:
   prometheus:
     image: prom/prometheus:latest
     container_name: shared-prometheus
-    ports:
-      - "9090:9090"
     volumes:
       - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
@@ -199,13 +197,18 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
+    labels:
+      # Traefik HTTPS configuration
+      - "traefik.enable=true"
+      - "traefik.http.routers.prometheus.rule=Host(`${PROMETHEUS_DOMAIN:-prometheus.local}`)"
+      - "traefik.http.routers.prometheus.entrypoints=websecure"
+      - "traefik.http.routers.prometheus.tls=true"
+      - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
 
   # === OBSERVABILITY: LOKI (LOG AGGREGATION) ===
   loki:
     image: grafana/loki:latest
     container_name: shared-loki
-    ports:
-      - "3100:3100"
     volumes:
       - ./config/loki-config.yml:/etc/loki/local-config.yml:ro
       - loki-data:/loki
@@ -218,18 +221,25 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
+    labels:
+      # Traefik HTTPS configuration
+      - "traefik.enable=true"
+      - "traefik.http.routers.loki.rule=Host(`${LOKI_DOMAIN:-loki.local}`)"
+      - "traefik.http.routers.loki.entrypoints=websecure"
+      - "traefik.http.routers.loki.tls=true"
+      - "traefik.http.services.loki.loadbalancer.server.port=3100"
 
   # === OBSERVABILITY: TEMPO (TRACES) ===
   tempo:
     image: grafana/tempo:latest
     container_name: shared-tempo
     ports:
-      - "3200:3200"
-      - "4317:4317"     # OTLP gRPC receiver
-      - "4318:4318"     # OTLP HTTP receiver
+      - "4317:4317"     # OTLP gRPC receiver (TLS)
+      - "4318:4318"     # OTLP HTTP receiver (TLS)
     volumes:
       - ./config/tempo-config.yml:/etc/tempo.yml:ro
       - tempo-data:/var/tempo
+      - ./certs:/certs:ro
     networks:
       - shared-services
     restart: unless-stopped
@@ -239,13 +249,18 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
+    labels:
+      # Traefik HTTPS configuration for Web UI
+      - "traefik.enable=true"
+      - "traefik.http.routers.tempo.rule=Host(`${TEMPO_DOMAIN:-tempo.local}`)"
+      - "traefik.http.routers.tempo.entrypoints=websecure"
+      - "traefik.http.routers.tempo.tls=true"
+      - "traefik.http.services.tempo.loadbalancer.server.port=3200"
 
   # === OBSERVABILITY: GRAFANA (DASHBOARD) ===
   grafana:
     image: grafana/grafana:latest
     container_name: shared-grafana
-    ports:
-      - "3000:3000"
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
       GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
@@ -265,6 +280,13 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
+    labels:
+      # Traefik HTTPS configuration
+      - "traefik.enable=true"
+      - "traefik.http.routers.grafana.rule=Host(`${GRAFANA_DOMAIN:-grafana.local}`)"
+      - "traefik.http.routers.grafana.entrypoints=websecure"
+      - "traefik.http.routers.grafana.tls=true"
+      - "traefik.http.services.grafana.loadbalancer.server.port=3000"
 
 networks:
   shared-services:
