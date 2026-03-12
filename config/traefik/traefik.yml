@@ -1,12 +1,11 @@
-# Traefik Static Configuration for Vault HTTPS
+# Traefik Static Configuration - Gateway Mode
+# Routing is managed centrally via dynamic.yml (file provider).
+# No Docker socket access is required.
 api:
   dashboard: true
   insecure: true  # Only for local development!
 
 providers:
-  docker:
-    exposedByDefault: false
-    network: shared-services
   file:
     filename: /etc/traefik/dynamic.yml
     watch: true

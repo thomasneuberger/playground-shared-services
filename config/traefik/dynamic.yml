@@ -1,80 +1,95 @@
-# Traefik Dynamic Configuration - TLS Certificates
+# Traefik Dynamic Configuration - Gateway Routing
+# All HTTP routing rules are defined here (Gateway pattern).
+# To customise domains, set the corresponding environment variables in your .env file
+# and update the rules below (Traefik file provider does not evaluate shell variables).
 http:
   routers:
+    # Traefik Dashboard
+    dashboard:
+      rule: "Host(`traefik.local`) || PathPrefix(`/dashboard`) || PathPrefix(`/api`)"
+      entryPoints:
+        - websecure
+      service: "api@internal"
+      tls: {}
+
     vault:
+      # Matches vault.local and localhost by default.
+      # For NAS deployment: add || Host(`<your-NAS-hostname>`) to this rule
+      # and update the corresponding entry in config/traefik/dynamic.yml.
+      # Example: "Host(`vault.local`) || Host(`localhost`) || Host(`nas.local`)"
       rule: "Host(`vault.local`) || Host(`localhost`)"
       entryPoints:
         - websecure
       service: vault-service
-      tls:
-        certResolver: vault-cert
-    
+      tls: {}
+
     keycloak:
+      # Default domain: keycloak.local — set KEYCLOAK_DOMAIN in .env to override,
+      # then update this rule accordingly.
       rule: "Host(`keycloak.local`)"
       entryPoints:
         - websecure
       service: keycloak-service
-      tls:
-        certResolver: keycloak-cert
-    
+      tls: {}
+
     grafana:
+      # Default domain: grafana.local — set GRAFANA_DOMAIN in .env to override.
       rule: "Host(`grafana.local`)"
       entryPoints:
         - websecure
       service: grafana-service
-      tls:
-        certResolver: grafana-cert
-    
+      tls: {}
+
     prometheus:
+      # Default domain: prometheus.local — set PROMETHEUS_DOMAIN in .env to override.
       rule: "Host(`prometheus.local`)"
       entryPoints:
         - websecure
       service: prometheus-service
-      tls:
-        certResolver: prometheus-cert
-    
+      tls: {}
+
     loki:
+      # Default domain: loki.local — set LOKI_DOMAIN in .env to override.
       rule: "Host(`loki.local`)"
       entryPoints:
         - websecure
       service: loki-service
-      tls:
-        certResolver: loki-cert
-    
+      tls: {}
+
     tempo:
+      # Default domain: tempo.local — set TEMPO_DOMAIN in .env to override.
       rule: "Host(`tempo.local`)"
       entryPoints:
         - websecure
       service: tempo-service
-      tls:
-        certResolver: tempo-cert
-  
+      tls: {}
+
   services:
     vault-service:
       loadBalancer:
         servers:
           - url: "http://vault:8201"
-    
+
     keycloak-service:
       loadBalancer:
         servers:
           - url: "http://keycloak:8080"
-    
+
     grafana-service:
       loadBalancer:
         servers:
           - url: "http://grafana:3000"
-    
+
     prometheus-service:
       loadBalancer:
         servers:
           - url: "http://prometheus:9090"
-    
+
     loki-service:
       loadBalancer:
         servers:
           - url: "http://loki:3100"
-    
+
     tempo-service:
       loadBalancer:
         servers:

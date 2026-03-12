@@ -306,25 +306,48 @@
 | Service | Port | Protocol | Purpose |
 |---------|------|----------|---------|
 | Keycloak | 8080 | HTTP | OpenID Connect/OAuth2/SAML Server |
-| RabbitMQ AMQP | 5672 | TCP | Message Broker |
-| RabbitMQ UI | 15672 | HTTP | Management Console |
+| RabbitMQ AMQP | 5671 | AMQPS | Message Broker (TLS) |
+| RabbitMQ UI | 15671 | HTTPS | Management Console (TLS) |
 | Vault | 8201 | HTTP | Secret Management & PKI |
-| Traefik HTTPS | 8443 | HTTPS | Reverse Proxy (HTTPS for Vault UI) |
-| Prometheus | 9090 | HTTP | Metrics DB |
-| Loki | 3100 | HTTP | Log Aggregation |
-| Tempo | 3200 | HTTP | Tracing Backend |
+| Traefik Gateway | 8443 | HTTPS | Gateway (file-based routing, TLS termination) |
+| Traefik Dashboard | 8088 | HTTP | Traefik Dashboard (insecure, local only) |
+| Prometheus | 9090 | HTTP | Metrics DB (internal, accessed via Gateway) |
+| Loki | 3100 | HTTP | Log Aggregation (internal, accessed via Gateway) |
+| Tempo | 3200 | HTTP | Tracing Backend (internal, accessed via Gateway) |
 | Tempo OTLP gRPC | 4317 | gRPC | Trace Collection |
 | Tempo OTLP HTTP | 4318 | HTTP | Trace Collection |
-| Grafana | 3000 | HTTP | Dashboards |
+| Grafana | 3000 | HTTP | Dashboards (internal, accessed via Gateway) |
 | PostgreSQL (Keycloak) | 5432 | TCP | Keycloak DB (internal) |
+
+## Gateway Routing (Traefik)
+
+Der Traefik-Container funktioniert als zentraler **Gateway**: Alle externen HTTPS-Anfragen
+kommen auf Port 8443 an und werden anhand der `Host()`-Regeln in `config/traefik/dynamic.yml`
+an die jeweiligen Container weitergeleitet. Der Docker Socket wird **nicht** benötigt
+(kein Docker-Provider, keine Docker-Labels).
+
+```
+Port 8443 → Traefik Gateway (config/traefik/dynamic.yml)
+                │
+                ├── Host(keycloak.local)  → keycloak:8080
+                ├── Host(vault.local)     → vault:8201
+                ├── Host(grafana.local)   → grafana:3000
+                ├── Host(prometheus.local)→ prometheus:9090
+                ├── Host(loki.local)      → loki:3100
+                ├── Host(tempo.local)     → tempo:3200
+                └── Host(traefik.local)   → api@internal (Dashboard)
+```
+
+**TLS-Zertifikate** werden statisch in `config/traefik/dynamic.yml` (Abschnitt `tls.certificates`)
+referenziert. Zertifikate liegen im `./certs`-Ordner und werden von Vault PKI ausgestellt.
 
 ## Network Isolation
 
 Alle Services laufen im `shared-services` Docker Netzwerk und kommunizieren intern über Container-Namen:
 - `keycloak:8080`
 - `keycloak-db:5432`
-- `rabbitmq:5672`
-- `vault:8200`
+- `rabbitmq:5671`
+- `vault:8201`
 - `prometheus:9090`
 - `loki:3100`
 - `tempo:3200`

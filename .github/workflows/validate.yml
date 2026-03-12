@@ -1,0 +1,93 @@
+name: Validate Docker Compose & Gateway Config
+
+on:
+  push:
+    paths:
+      - "docker-compose.yml"
+      - "config/traefik/**"
+  pull_request:
+    paths:
+      - "docker-compose.yml"
+      - "config/traefik/**"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    name: Validate configuration files
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate docker-compose.yml syntax
+        run: docker compose config --quiet
+
+      - name: Validate Traefik static config (traefik.yml)
+        run: |
+          python3 - <<'EOF'
+          import yaml, sys
+          with open("config/traefik/traefik.yml") as f:
+              cfg = yaml.safe_load(f)
+          providers = cfg.get("providers", {})
+          if "docker" in providers:
+              print("ERROR: Docker provider found in traefik.yml – Gateway mode requires file provider only.")
+              sys.exit(1)
+          if "file" not in providers:
+              print("ERROR: File provider not configured in traefik.yml.")
+              sys.exit(1)
+          print("traefik.yml: OK (file provider only – Gateway mode)")
+          EOF
+
+      - name: Validate Traefik dynamic config (dynamic.yml)
+        run: |
+          python3 - <<'EOF'
+          import yaml, sys
+          with open("config/traefik/dynamic.yml") as f:
+              cfg = yaml.safe_load(f)
+          routers = cfg.get("http", {}).get("routers", {})
+          services = cfg.get("http", {}).get("services", {})
+          required_routers = {"vault", "keycloak", "grafana", "prometheus", "loki", "tempo", "dashboard"}
+          missing = required_routers - set(routers.keys())
+          if missing:
+              print(f"ERROR: Missing routers in dynamic.yml: {missing}")
+              sys.exit(1)
+          print(f"dynamic.yml: OK – all required gateway routes present: {sorted(routers.keys())}")
+          EOF
+
+      - name: Check docker-compose.yml has no Traefik Docker labels
+        run: |
+          python3 - <<'EOF'
+          import yaml, sys
+          with open("docker-compose.yml") as f:
+              cfg = yaml.safe_load(f)
+          found = []
+          for name, svc in (cfg.get("services") or {}).items():
+              labels = svc.get("labels") or []
+              if isinstance(labels, dict):
+                  labels = list(labels.keys())
+              traefik_labels = [l for l in labels if str(l).startswith("traefik.")]
+              if traefik_labels:
+                  found.append((name, traefik_labels))
+          if found:
+              for svc, lbls in found:
+                  print(f"ERROR: Service '{svc}' still has Traefik Docker labels: {lbls}")
+              sys.exit(1)
+          print("docker-compose.yml: OK – no Traefik Docker labels (Gateway mode)")
+          EOF
+
+      - name: Check Traefik does not mount Docker socket
+        run: |
+          python3 - <<'EOF'
+          import yaml, sys
+          with open("docker-compose.yml") as f:
+              cfg = yaml.safe_load(f)
+          traefik_svc = (cfg.get("services") or {}).get("traefik", {})
+          volumes = traefik_svc.get("volumes") or []
+          socket_mounts = [v for v in volumes if "docker.sock" in str(v)]
+          if socket_mounts:
+              print(f"ERROR: Traefik still mounts Docker socket: {socket_mounts}")
+              sys.exit(1)
+          print("docker-compose.yml: OK – Traefik does not mount Docker socket")
+          EOF
