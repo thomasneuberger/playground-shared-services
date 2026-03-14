@@ -97,6 +97,8 @@ http:
 
 tls:
   certificates:
+    - certFile: /certs/traefik.local.crt
+      keyFile: /certs/traefik.local.key
     - certFile: /certs/vault.local.crt
       keyFile: /certs/vault.local.key
     - certFile: /certs/keycloak.local.crt

@@ -3,7 +3,6 @@
 # No Docker socket access is required.
 api:
   dashboard: true
-  insecure: true  # Only for local development!
 
 providers:
   file:

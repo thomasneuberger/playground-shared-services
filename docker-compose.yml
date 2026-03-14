@@ -21,8 +21,6 @@ services:
   keycloak:
     image: quay.io/keycloak/keycloak:latest
     container_name: shared-keycloak
-    ports:
-      - "8082:8080"      # HTTP (Traefik proxies to this)
     environment:
       # Database Configuration
       KC_DB: postgres
@@ -132,8 +130,7 @@ services:
     image: traefik:v2.11
     container_name: shared-traefik
     ports:
-      - "8443:443"      # HTTPS Gateway entrypoint
-      - "8088:8080"     # Traefik Dashboard
+      - "8443:443"      # HTTPS Gateway entrypoint (all services + dashboard)
     # Static config is loaded from config/traefik/traefik.yml;
     # routing rules are in config/traefik/dynamic.yml (Gateway pattern).
     volumes:

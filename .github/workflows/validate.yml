@@ -37,7 +37,11 @@ jobs:
           if "file" not in providers:
               print("ERROR: File provider not configured in traefik.yml.")
               sys.exit(1)
-          print("traefik.yml: OK (file provider only – Gateway mode)")
+          api = cfg.get("api", {})
+          if api.get("insecure"):
+              print("ERROR: api.insecure is true in traefik.yml – Dashboard must be HTTPS only.")
+              sys.exit(1)
+          print("traefik.yml: OK (file provider only, dashboard HTTPS only – Gateway mode)")
           EOF
 
       - name: Validate Traefik dynamic config (dynamic.yml)
