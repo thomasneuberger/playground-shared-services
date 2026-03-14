@@ -246,8 +246,8 @@ server.serve_forever()
 ## 📚 Weiterführende Dokumentation
 
 - **[PKI_SETUP_VAULT.md](PKI_SETUP_VAULT.md)** - Detaillierte Vault PKI Anleitung
-- **[scripts/README.md](scripts/README.md)** - Dokumentation der Zertifikatsskripte
-- **[ARCHITECTURE.md](ARCHITECTURE.md)** - Gesamtarchitektur
+- **[scripts/README.md](../scripts/README.md)** - Dokumentation der Zertifikatsskripte
+- **[ARCHITECTURE.md](../ARCHITECTURE.md)** - Gesamtarchitektur
 
 ## 🐛 Troubleshooting
 

@@ -442,8 +442,8 @@ grep -c "BEGIN CERTIFICATE" ./certs/myapp.local.crt  # Sollte: 2 (oder mehr)
 
 ## �📚 Weiterführende Links
 
-- [PKI_SETUP_VAULT.md](../PKI_SETUP_VAULT.md) - Detaillierte PKI Dokumentation
-- [VAULT_PKI_MIGRATION.md](../VAULT_PKI_MIGRATION.md) - Migration von Step CA
+- [PKI_SETUP_VAULT.md](./PKI_SETUP_VAULT.md) - Detaillierte PKI Dokumentation
+- [VAULT_PKI_MIGRATION.md](./VAULT_PKI_MIGRATION.md) - Migration von Step CA
 - [Vault PKI Documentation](https://developer.hashicorp.com/vault/docs/secrets/pki)
 - [Vault CLI Reference](https://developer.hashicorp.com/vault/docs/commands)
 
