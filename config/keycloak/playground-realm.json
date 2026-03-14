@@ -1,0 +1,107 @@
+{
+  "realm": "playground",
+  "enabled": true,
+  "displayName": "Playground",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "rememberMe": true,
+  "groups": [
+    {
+      "name": "traefik-dashboard-access",
+      "path": "/traefik-dashboard-access"
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "traefik-dashboard",
+      "name": "Traefik Dashboard",
+      "description": "OIDC client for Traefik dashboard authentication via oauth2-proxy",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "${TRAEFIK_OIDC_CLIENT_SECRET}",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "implicitFlowEnabled": false,
+      "frontchannelLogout": true,
+      "fullScopeAllowed": false,
+      "rootUrl": "https://traefik.local:8443",
+      "baseUrl": "https://traefik.local:8443/dashboard/",
+      "adminUrl": "https://traefik.local:8443/",
+      "redirectUris": [
+        "https://traefik.local:8443/oauth2/callback"
+      ],
+      "webOrigins": [
+        "https://traefik.local:8443"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "+"
+      },
+      "protocolMappers": [
+        {
+          "name": "audience-traefik-dashboard",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "traefik-dashboard",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        },
+        {
+          "name": "groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "consentRequired": false,
+          "config": {
+            "full.path": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "claim.name": "groups",
+            "jsonType.label": "String"
+          }
+        }
+      ]
+    }
+  ],
+  "identityProviders": [
+    {
+      "alias": "entraid",
+      "displayName": "Microsoft Entra ID",
+      "providerId": "oidc",
+      "enabled": true,
+      "updateProfileFirstLoginMode": "on",
+      "trustEmail": true,
+      "storeToken": false,
+      "addReadTokenRoleOnCreate": false,
+      "authenticateByDefault": false,
+      "linkOnly": false,
+      "firstBrokerLoginFlowAlias": "first broker login",
+      "postBrokerLoginFlowAlias": "",
+      "config": {
+        "clientId": "${KEYCLOAK_ENTRA_ID_CLIENT_ID}",
+        "clientSecret": "${KEYCLOAK_ENTRA_ID_CLIENT_SECRET}",
+        "issuer": "https://login.microsoftonline.com/${KEYCLOAK_ENTRA_ID_TENANT_ID}/v2.0",
+        "authorizationUrl": "https://login.microsoftonline.com/${KEYCLOAK_ENTRA_ID_TENANT_ID}/oauth2/v2.0/authorize",
+        "tokenUrl": "https://login.microsoftonline.com/${KEYCLOAK_ENTRA_ID_TENANT_ID}/oauth2/v2.0/token",
+        "logoutUrl": "https://login.microsoftonline.com/${KEYCLOAK_ENTRA_ID_TENANT_ID}/oauth2/v2.0/logout",
+        "userInfoUrl": "https://graph.microsoft.com/oidc/userinfo",
+        "defaultScope": "openid profile email",
+        "syncMode": "IMPORT",
+        "validateSignature": "true",
+        "useJwksUrl": "true",
+        "pkceEnabled": "true",
+        "pkceMethod": "S256",
+        "backchannelSupported": "true",
+        "disableUserInfo": "false"
+      }
+    }
+  ]
+}
