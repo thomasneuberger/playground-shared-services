@@ -21,8 +21,6 @@ services:
   keycloak:
     image: quay.io/keycloak/keycloak:latest
     container_name: shared-keycloak
-    ports:
-      - "8082:8080"      # HTTP (Traefik proxies to this)
     environment:
       # Database Configuration
       KC_DB: postgres
@@ -56,13 +54,6 @@ services:
       - "--hostname=https://${KEYCLOAK_DOMAIN:-keycloak.local}:8443"
       - "--proxy-headers=xforwarded"
       - "--hostname-strict=false"
-    labels:
-      # Traefik HTTPS configuration
-      - "traefik.enable=true"
-      - "traefik.http.routers.keycloak.rule=Host(`${KEYCLOAK_DOMAIN:-keycloak.local}`)"
-      - "traefik.http.routers.keycloak.entrypoints=websecure"
-      - "traefik.http.routers.keycloak.tls=true"
-      - "traefik.http.services.keycloak.loadbalancer.server.port=8080"
 
   # === MESSAGING ===
   rabbitmq:
@@ -113,13 +104,6 @@ services:
       timeout: 10s
       retries: 5
       start_period: 20s
-    labels:
-      # Traefik configuration for HTTPS access
-      - "traefik.enable=true"
-      - "traefik.http.routers.vault.rule=Host(`vault.local`) || Host(`localhost`) || Host(`${HOST_NAME:-localhost}`)"
-      - "traefik.http.routers.vault.entrypoints=websecure"
-      - "traefik.http.routers.vault.tls=true"
-      - "traefik.http.services.vault.loadbalancer.server.port=8201"
 
   # Vault PKI Initialization
   vault-pki-init:
@@ -141,30 +125,15 @@ services:
         condition: service_healthy
     entrypoint: ["/bin/sh", "/vault/init-pki.sh"]
 
-  # === TRAEFIK REVERSE PROXY (HTTPS for Vault) ===
+  # === TRAEFIK REVERSE PROXY (Gateway - file-based routing) ===
   traefik:
     image: traefik:v2.11
     container_name: shared-traefik
     ports:
-      - "8443:443"      # HTTPS for Vault UI
-      - "8088:8080"     # Traefik Dashboard
-    command:
-      # Docker provider
-      - "--providers.docker=true"
-      - "--providers.docker.exposedbydefault=false"
-      - "--providers.docker.network=shared-services"
-      # File provider for TLS certificates
-      - "--providers.file.filename=/etc/traefik/dynamic.yml"
-      - "--providers.file.watch=true"
-      # Entry points
-      - "--entrypoints.websecure.address=:443"
-      # Dashboard
-      - "--api.dashboard=true"
-      - "--api.insecure=true"
-      # Logging
-      - "--log.level=INFO"
+      - "8443:443"      # HTTPS Gateway entrypoint (all services + dashboard)
+    # Static config is loaded from config/traefik/traefik.yml;
+    # routing rules are in config/traefik/dynamic.yml (Gateway pattern).
     volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock:ro"
       - ./config/traefik:/etc/traefik:ro
       - ./certs:/certs:ro
     networks:
@@ -172,12 +141,6 @@ services:
     depends_on:
       - vault
     restart: unless-stopped
-    labels:
-      - "traefik.enable=true"
-      # Dashboard routing
-      - "traefik.http.routers.dashboard.rule=Host(`traefik.local`) || PathPrefix(`/dashboard`) || PathPrefix(`/api`)"
-      - "traefik.http.routers.dashboard.service=api@internal"
-      - "traefik.http.routers.dashboard.entrypoints=websecure"
 
   # === OBSERVABILITY: PROMETHEUS ===
   prometheus:
@@ -197,13 +160,6 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-    labels:
-      # Traefik HTTPS configuration
-      - "traefik.enable=true"
-      - "traefik.http.routers.prometheus.rule=Host(`${PROMETHEUS_DOMAIN:-prometheus.local}`)"
-      - "traefik.http.routers.prometheus.entrypoints=websecure"
-      - "traefik.http.routers.prometheus.tls=true"
-      - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
 
   # === OBSERVABILITY: LOKI (LOG AGGREGATION) ===
   loki:
@@ -221,13 +177,6 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-    labels:
-      # Traefik HTTPS configuration
-      - "traefik.enable=true"
-      - "traefik.http.routers.loki.rule=Host(`${LOKI_DOMAIN:-loki.local}`)"
-      - "traefik.http.routers.loki.entrypoints=websecure"
-      - "traefik.http.routers.loki.tls=true"
-      - "traefik.http.services.loki.loadbalancer.server.port=3100"
 
   # === OBSERVABILITY: TEMPO (TRACES) ===
   tempo:
@@ -249,13 +198,6 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-    labels:
-      # Traefik HTTPS configuration for Web UI
-      - "traefik.enable=true"
-      - "traefik.http.routers.tempo.rule=Host(`${TEMPO_DOMAIN:-tempo.local}`)"
-      - "traefik.http.routers.tempo.entrypoints=websecure"
-      - "traefik.http.routers.tempo.tls=true"
-      - "traefik.http.services.tempo.loadbalancer.server.port=3200"
 
   # === OBSERVABILITY: GRAFANA (DASHBOARD) ===
   grafana:
@@ -280,13 +222,6 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-    labels:
-      # Traefik HTTPS configuration
-      - "traefik.enable=true"
-      - "traefik.http.routers.grafana.rule=Host(`${GRAFANA_DOMAIN:-grafana.local}`)"
-      - "traefik.http.routers.grafana.entrypoints=websecure"
-      - "traefik.http.routers.grafana.tls=true"
-      - "traefik.http.services.grafana.loadbalancer.server.port=3000"
 
 networks:
   shared-services:

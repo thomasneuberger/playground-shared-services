@@ -4,7 +4,7 @@ Ein vollständiges Docker Compose Setup mit Open-Source Komponenten für ein Sha
 
 ## 🚀 Komponenten
 
-- **Keycloak** (Port 8082) - OpenID Connect / OAuth2 / SAML Authentifizierung
+- **Keycloak** (HTTPS via Gateway) - OpenID Connect / OAuth2 / SAML Authentifizierung
 - **RabbitMQ** (5671, 15671) - Message Queue mit TLS + HTTPS Management UI
 - **Vault** (8201) - Secret Store & PKI Engine für SSL/TLS Zertifikate
 - **Prometheus** (HTTPS only) - Metriken-Erfassung
@@ -12,6 +12,34 @@ Ein vollständiges Docker Compose Setup mit Open-Source Komponenten für ein Sha
 - **Tempo** (HTTPS only, OTLP: 4317, 4318) - Distributed Tracing (OpenTelemetry)
 - **Grafana** (HTTPS only) - Observability Dashboard
 - **PostgreSQL** - Datenbank für Keycloak
+
+## 🌐 Gateway (Traefik) – Architektur
+
+Der Reverse Proxy (Traefik) läuft im **Gateway-Modus**: Alle Routing-Regeln sind zentral
+in `config/traefik/dynamic.yml` definiert. Traefik benötigt keinen Zugriff auf den Docker Socket
+und verwendet keinerlei Docker-Labels. Dies erhöht die Sicherheit und macht die Konfiguration
+explizit und auditierbar.
+
+```
+Internet / NAS
+     │
+     ▼  Port 8443 (HTTPS)
+ ┌──────────────────────────┐
+ │  Traefik Gateway         │  config/traefik/traefik.yml  (statische Konfig)
+ │  (file provider only)    │  config/traefik/dynamic.yml  (Routing-Regeln)
+ └──────────────────────────┘
+     │
+     ├──► keycloak.local  → Keycloak  :8080
+     ├──► vault.local     → Vault     :8201
+     ├──► grafana.local   → Grafana   :3000
+     ├──► prometheus.local→ Prometheus:9090
+     ├──► loki.local      → Loki      :3100
+     ├──► tempo.local     → Tempo     :3200
+     └──► traefik.local   → Dashboard
+```
+
+**Domain-Anpassung:** Wenn du eigene Domains (statt `*.local`) verwenden möchtest,
+aktualisiere die `rule:`-Einträge in `config/traefik/dynamic.yml` direkt.
 
 ## 📋 Voraussetzungen
 
@@ -73,14 +101,22 @@ docker compose ps --format "table {{.Service}}\t{{.State}}\t{{.Status}}"
 
 ## 🌐 Zugriff auf Services
 
+Alle Services sind ausschließlich über HTTPS via den Traefik Gateway auf Port 8443 erreichbar:
+
 | Service | URL | Credentials |
 |---------|-----|-------------|
-| **Keycloak** | http://localhost:8082 | admin / (siehe .env) |
-| **Keycloak (HTTPS)** | https://keycloak.local:8443 | admin / (siehe .env) |
+| **Keycloak** | https://keycloak.local:8443 | admin / (siehe .env) |
 | **Grafana** | https://grafana.local:8443 | admin / (siehe .env) |
 | **Prometheus** | https://prometheus.local:8443 | - |
 | **Loki** | https://loki.local:8443 | - |
 | **Tempo** | https://tempo.local:8443 | - |
+| **Traefik Dashboard** | https://traefik.local:8443/dashboard/ | - |
+
+> **Hinweis:** Domain-Namen müssen in `/etc/hosts` (Linux/macOS) bzw.
+> `C:\Windows\System32\drivers\etc\hosts` (Windows) eingetragen sein:
+> ```
+> 127.0.0.1  keycloak.local vault.local grafana.local prometheus.local loki.local tempo.local traefik.local
+> ```
 
 ## 📊 Grafana Setup (beim ersten Start)
 
@@ -92,9 +128,10 @@ docker compose ps --format "table {{.Service}}\t{{.State}}\t{{.Status}}"
    - Tempo (Traces)
 4. Erstelle ein Dashboard oder führe Queries aus
 
-### HTTPS-Konfiguration für Grafana (Traefik TLS Termination)
+### HTTPS-Konfiguration für Grafana (Traefik Gateway TLS Termination)
 
-Grafana ist über HTTPS via Traefik mit Vault PKI Zertifikaten konfiguriert:
+Grafana ist über HTTPS via den Traefik **Gateway** mit Vault PKI Zertifikaten konfiguriert.
+Das Routing ist in `config/traefik/dynamic.yml` unter dem Router `grafana` definiert.
 
 📖 **[GRAFANA_VAULT_HTTPS.md](./GRAFANA_VAULT_HTTPS.md)** - Vollständige Anleitung zur HTTPS-Konfiguration
 
@@ -103,7 +140,7 @@ Quick Start:
 # Zertifikat von Vault PKI generieren
 .\scripts\generate-certs-vault.ps1 -Domain "grafana.local"
 
-# Services neu starten (Traefik lädt das Zertifikat automatisch)
+# Services neu starten (Traefik Gateway lädt das Zertifikat automatisch neu)
 docker compose up -d
 ```
 
@@ -136,11 +173,11 @@ vault kv get secret/myapp/database
 ```
 ## 🔐 Keycloak Setup (Initial)
 
-Keycloak wird automatisch initialisiert. Admin-Zugriff:
+Keycloak wird automatisch initialisiert. Admin-Zugriff über HTTPS via Traefik Gateway:
 
 ```bash
-# 1. Öffne Keycloak Admin Console (HTTP)
-# http://localhost:8082/admin
+# 1. Öffne Keycloak Admin Console (HTTPS via Traefik Gateway)
+# https://keycloak.local:8443/admin
 
 # 2. Login mit Admin-Credentials (aus .env)
 # admin / <KEYCLOAK_ADMIN_PASSWORD>
@@ -158,9 +195,10 @@ Keycloak wird automatisch initialisiert. Admin-Zugriff:
 #                        https://keycloak.local/* (für HTTPS via Traefik)
 ```
 
-### HTTPS-Konfiguration für Keycloak (Traefik TLS Termination)
+### HTTPS-Konfiguration für Keycloak (Traefik Gateway TLS Termination)
 
-Keycloak kann über HTTPS via Traefik mit Vault PKI Zertifikaten konfiguriert werden:
+Keycloak kann über HTTPS via den Traefik **Gateway** mit Vault PKI Zertifikaten konfiguriert werden.
+Das Routing ist in `config/traefik/dynamic.yml` unter dem Router `keycloak` definiert.
 
 📖 **[KEYCLOAK_VAULT_HTTPS.md](./KEYCLOAK_VAULT_HTTPS.md)** - Vollständige Anleitung zur HTTPS-Konfiguration
 
@@ -169,15 +207,14 @@ Quick Start:
 # Zertifikat von Vault PKI generieren
 .\scripts\generate-certs-vault.ps1 -Domain "keycloak.local"
 
-# Services neu starten (Traefik lädt das Zertifikat automatisch)
+# Services neu starten (Traefik Gateway lädt das Zertifikat automatisch neu)
 docker compose up -d
 ```
 
-Dann über folgende URLs zugreifen:
-- HTTP: http://localhost:8082/admin (direkter Keycloak-Zugriff)
-- HTTPS: https://keycloak.local/admin (über Traefik @ Port 8443)
+Dann über HTTPS zugreifen:
+- HTTPS: https://keycloak.local:8443/admin (über Traefik Gateway @ Port 8443)
 
-**Hinweis:** Für HTTPS via Traefik muss `keycloak.local` in deiner `/etc/hosts` (Linux/macOS) oder `C:\Windows\System32\drivers\etc\hosts` (Windows) eingetragen sein, oder du nutzt einen echten DNS-Namen.
+**Hinweis:** Für HTTPS via Traefik Gateway muss `keycloak.local` in deiner `/etc/hosts` (Linux/macOS) oder `C:\Windows\System32\drivers\etc\hosts` (Windows) eingetragen sein, oder du nutzt einen echten DNS-Namen.
 
 ## 🔑 Vault PKI Setup
 
@@ -196,7 +233,27 @@ Vault PKI wird automatisch beim Start initialisiert. Für Zertifikatsverwaltung:
 .\scripts\generate-certs-vault.ps1 -ExportRootCA
 ```
 
-**Wichtig**: Root CA im System Trust Store registrieren:
+**Wichtig**: Beim ersten Setup müssen Zertifikate für **alle** Domains inkl. `traefik.local` generiert werden:
+
+```powershell
+# Alle benötigten Zertifikate generieren (Windows PowerShell)
+.\scripts\generate-certs-vault.ps1 -Domain "traefik.local"
+.\scripts\generate-certs-vault.ps1 -Domain "vault.local"
+.\scripts\generate-certs-vault.ps1 -Domain "keycloak.local"
+.\scripts\generate-certs-vault.ps1 -Domain "grafana.local"
+.\scripts\generate-certs-vault.ps1 -Domain "prometheus.local"
+.\scripts\generate-certs-vault.ps1 -Domain "loki.local"
+.\scripts\generate-certs-vault.ps1 -Domain "tempo.local"
+```
+
+```bash
+# Alle benötigten Zertifikate generieren (Linux/macOS)
+for domain in traefik.local vault.local keycloak.local grafana.local prometheus.local loki.local tempo.local; do
+  ./scripts/generate-certs-vault.sh -d "$domain"
+done
+```
+
+**Root CA im System Trust Store registrieren** (damit Browser das Zertifikat akzeptieren):
 
 ```powershell
 # Windows (als Administrator)
@@ -221,7 +278,7 @@ Siehe [PKI_SETUP_VAULT.md](PKI_SETUP_VAULT.md) für detaillierte Dokumentation.
 
 ### Prometheus Metrics sammeln
 
-Prometheus ist über HTTPS via Traefik verfügbar:
+Prometheus ist über HTTPS via den Traefik **Gateway** verfügbar (Router `prometheus` in `config/traefik/dynamic.yml`):
 
 📚 **[PROMETHEUS_VAULT_HTTPS.md](./PROMETHEUS_VAULT_HTTPS.md)** - Vollständige Anleitung zur HTTPS-Konfiguration
 
@@ -240,7 +297,7 @@ Zugriff:
 
 ### Loki Logs durchsuchen
 
-Loki ist über HTTPS via Traefik verfügbar:
+Loki ist über HTTPS via den Traefik **Gateway** verfügbar (Router `loki` in `config/traefik/dynamic.yml`):
 
 📚 **[LOKI_VAULT_HTTPS.md](./LOKI_VAULT_HTTPS.md)** - Vollständige Anleitung zur HTTPS-Konfiguration
 
@@ -260,14 +317,14 @@ Zugriff:
 
 **Alternative (interne Abfrage für Legacy-Zwecke):**
 ```bash
-# Logs via direkter Loki Query (nicht über Traefik):
+# Logs via direkter Loki Query (nicht über Traefik Gateway):
 curl -G -s "http://localhost:3100/loki/api/v1/query_range" \
   --data-urlencode 'query={job="prometheus"}' | jq .
 ```
 
 ### Tempo Traces
 
-Tempo ist über HTTPS via Traefik verfügbar:
+Tempo ist über HTTPS via den Traefik **Gateway** verfügbar (Router `tempo` in `config/traefik/dynamic.yml`):
 
 📚 **[TEMPO_VAULT_HTTPS.md](./TEMPO_VAULT_HTTPS.md)** - Vollständige Anleitung zur HTTPS-Konfiguration
 
@@ -319,56 +376,68 @@ HOST_NAME=192.168.1.100
 HOST_NAME=mynas.example.com
 ```
 
-### 2. Services nach Hostname-Änderung neu starten
+### 2. Gateway-Routing für NAS-Hostname anpassen
+
+Da der Traefik **Gateway** die Routen aus `config/traefik/dynamic.yml` liest (keine Docker-Labels),
+musst du dort die `vault`-Routing-Regel um deinen NAS-Hostnamen erweitern:
+
+```yaml
+# config/traefik/dynamic.yml – vault router (vor der Änderung):
+vault:
+  rule: "Host(`vault.local`) || Host(`localhost`)"
+
+# Nach der Änderung mit NAS-Hostname nas.local:
+vault:
+  rule: "Host(`vault.local`) || Host(`localhost`) || Host(`nas.local`)"
+```
+
+Ersetze `nas.local` durch deinen tatsächlichen `HOST_NAME`-Wert.
+
+### 3. Services nach Hostname-Änderung neu starten
 
 ```bash
 # Stoppe alle Services
 docker compose down
 
-# Lösche Step CA Daten (damit Zertifikate mit neuem Hostname erstellt werden)
-docker volume rm playground-shared-services_step-ca-data
-
 # Starte Services neu
 docker compose up -d
 ```
 
-### 3. Zugriff auf Services
+### 4. Zugriff auf Services
 
-Ersetze `localhost` mit deinem Hostname:
-
-- **Keycloak**: `http://<HOST_NAME>:8082/admin`
-- **Grafana**: `https://grafana.local:8443` (via Traefik HTTPS)
-- **Prometheus**: `https://prometheus.local:8443` (via Traefik HTTPS)
-- **Loki**: `https://loki.local:8443` (via Traefik HTTPS)
-- **Tempo**: `https://tempo.local:8443` (via Traefik HTTPS)
+- **Keycloak**: `https://keycloak.local:8443/admin` (via Traefik Gateway HTTPS)
+- **Grafana**: `https://grafana.local:8443` (via Traefik Gateway HTTPS)
+- **Prometheus**: `https://prometheus.local:8443` (via Traefik Gateway HTTPS)
+- **Loki**: `https://loki.local:8443` (via Traefik Gateway HTTPS)
+- **Tempo**: `https://tempo.local:8443` (via Traefik Gateway HTTPS)
 - **RabbitMQ**: `https://rabbit.local:15671`
 - **Vault**: `http://<HOST_NAME>:8201`
 
-### 4. Keycloak Redirect URIs anpassen
+### 5. Keycloak Redirect URIs anpassen
 
 In Keycloak Admin Console → Clients → dein Client:
 
 - **Valid Redirect URIs**: `http://<HOST_NAME>:YOUR_APP_PORT/*`
 - **Web Origins**: `http://<HOST_NAME>:YOUR_APP_PORT`
 
-### 5. ASP.NET Core Apps anpassen
+### 6. ASP.NET Core Apps anpassen
 
 In deinen App-Konfigurationen:
 
 ```json
 {
   "Keycloak": {
-    "Authority": "http://<HOST_NAME>:8082/realms/myapp",
+    "Authority": "https://keycloak.local:8443/realms/myapp",
     ...
   }
 }
 ```
 
-### 6. Firewall / Netzwerk
+### 7. Firewall / Netzwerk
 
 Stelle sicher, dass folgende Ports auf deinem NAS erreichbar sind:
-- 8082 (Keycloak), 8201 (Vault)
-- 8443 (Traefik HTTPS - für Grafana, Keycloak, Prometheus, Loki, Tempo)
+- 8443 (Traefik Gateway HTTPS - für alle Services inkl. Keycloak, Grafana, Prometheus, Loki, Tempo)
+- 8201 (Vault) für direkte PKI-Script-Zugriffe
 - 15671 (RabbitMQ UI HTTPS)
 - 5671 (RabbitMQ AMQPS) für App-Zugriff
 - 4317, 4318 (Tempo OTLP Receivers) für Trace-Ingestion
@@ -392,7 +461,7 @@ docker compose up -d --build
 
 ```yaml
 ports:
-  - "8083:8080"  # Keycloak auf Port 8083 statt 8082
+  - "8444:443"  # Traefik Gateway auf Port 8444 statt 8443
 ```
 
 ### Vault lädt nicht

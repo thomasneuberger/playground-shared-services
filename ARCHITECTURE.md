@@ -303,31 +303,54 @@
 
 ## Port Mapping Summary
 
-| Service | Port | Protocol | Purpose |
-|---------|------|----------|---------|
-| Keycloak | 8080 | HTTP | OpenID Connect/OAuth2/SAML Server |
-| RabbitMQ AMQP | 5672 | TCP | Message Broker |
-| RabbitMQ UI | 15672 | HTTP | Management Console |
-| Vault | 8201 | HTTP | Secret Management & PKI |
-| Traefik HTTPS | 8443 | HTTPS | Reverse Proxy (HTTPS for Vault UI) |
-| Prometheus | 9090 | HTTP | Metrics DB |
-| Loki | 3100 | HTTP | Log Aggregation |
-| Tempo | 3200 | HTTP | Tracing Backend |
-| Tempo OTLP gRPC | 4317 | gRPC | Trace Collection |
-| Tempo OTLP HTTP | 4318 | HTTP | Trace Collection |
-| Grafana | 3000 | HTTP | Dashboards |
-| PostgreSQL (Keycloak) | 5432 | TCP | Keycloak DB (internal) |
+Only the following ports are exposed on the host (externally reachable):
+
+| Service | Host Port | Protocol | Purpose |
+|---------|-----------|----------|---------|
+| Traefik Gateway | **8443** | HTTPS | Single HTTPS entrypoint – all services incl. Dashboard |
+| Vault | 8201 | HTTP | Secret Management & PKI (direct API access for scripts) |
+| RabbitMQ AMQP | 5671 | AMQPS | Message Broker (TLS) |
+| RabbitMQ Management | 15671 | HTTPS | Management Console (TLS) |
+| Tempo OTLP gRPC | 4317 | gRPC/TLS | Trace collection from applications |
+| Tempo OTLP HTTP | 4318 | HTTP/TLS | Trace collection from applications |
+
+All other services (Keycloak, Grafana, Prometheus, Loki, Tempo UI) are **not** exposed directly and are only reachable via the Traefik Gateway on port 8443.
+
+## Gateway Routing (Traefik)
+
+Der Traefik-Container funktioniert als zentraler **Gateway**: Alle externen HTTPS-Anfragen
+kommen auf Port 8443 an und werden anhand der `Host()`-Regeln in `config/traefik/dynamic.yml`
+an die jeweiligen Container weitergeleitet. Der Docker Socket wird **nicht** benötigt
+(kein Docker-Provider, keine Docker-Labels).
+
+```
+Port 8443 → Traefik Gateway (config/traefik/dynamic.yml)
+                │
+                ├── Host(keycloak.local)  → keycloak:8080   (HTTPS only)
+                ├── Host(vault.local)     → vault:8201
+                ├── Host(grafana.local)   → grafana:3000    (HTTPS only)
+                ├── Host(prometheus.local)→ prometheus:9090 (HTTPS only)
+                ├── Host(loki.local)      → loki:3100       (HTTPS only)
+                ├── Host(tempo.local)     → tempo:3200      (HTTPS only)
+                └── Host(traefik.local)   → api@internal    (Dashboard, HTTPS only)
+```
+
+**TLS-Zertifikate** werden statisch in `config/traefik/dynamic.yml` (Abschnitt `tls.certificates`)
+referenziert. Zertifikate liegen im `./certs`-Ordner und werden von Vault PKI ausgestellt.
+Für jeden `*.local`-Hostnamen muss ein eigenes Zertifikat generiert werden (inkl. `traefik.local`).
 
 ## Network Isolation
 
-Alle Services laufen im `shared-services` Docker Netzwerk und kommunizieren intern über Container-Namen:
-- `keycloak:8080`
-- `keycloak-db:5432`
-- `rabbitmq:5672`
-- `vault:8200`
-- `prometheus:9090`
-- `loki:3100`
-- `tempo:3200`
-- `grafana:3000`
+Alle Services laufen im `shared-services` Docker Netzwerk. Sie sind vom Host aus
+**ausschließlich** über die oben genannten exponierten Ports erreichbar.
+Intern kommunizieren die Container über ihre Namen:
+- `keycloak:8080` (nur intern, kein direkter Host-Zugriff)
+- `keycloak-db:5432` (intern)
+- `rabbitmq:5671` (AMQPS)
+- `vault:8201` (HTTPS via Gateway + direkt für PKI-Scripts)
+- `prometheus:9090` (nur intern, kein direkter Host-Zugriff)
+- `loki:3100` (nur intern, kein direkter Host-Zugriff)
+- `tempo:3200` (nur intern, kein direkter Host-Zugriff)
+- `grafana:3000` (nur intern, kein direkter Host-Zugriff)
 
 Client-Applications könnten über das Host-System oder ein separates Netzwerk verbunden werden.
