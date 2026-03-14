@@ -9,7 +9,7 @@ This directory contains certificate management scripts for the Shared Services p
 The platform now uses **HashiCorp Vault PKI Engine** (not Step CA).
 
 **All documentation for certificate generation has moved to:**
-👉 **[README_VAULT_PKI.md](./README_VAULT_PKI.md)**
+👉 **[README_VAULT_PKI.md](../vault/README_VAULT_PKI.md)**
 
 ## Quick Start
 
@@ -58,13 +58,13 @@ Use the same scripts as above. The certificate is automatically picked up by Tra
 
 Then restart services: `docker compose up -d`
 
-👉 **[../../KEYCLOAK_VAULT_HTTPS.md](../KEYCLOAK_VAULT_HTTPS.md)** - Full Keycloak HTTPS setup guide
+👉 **[KEYCLOAK_VAULT_HTTPS.md](../keycloak/KEYCLOAK_VAULT_HTTPS.md)** - Full Keycloak HTTPS setup guide
 
 ## 📚 Documentation
 
-- **[README_VAULT_PKI.md](./README_VAULT_PKI.md)** - Full Vault PKI documentation
-- **[../PKI_SETUP_VAULT.md](../PKI_SETUP_VAULT.md)** - PKI initialization guide
-- **[../VAULT_HTTPS_SETUP.md](../VAULT_HTTPS_SETUP.md)** - Traefik HTTPS setup
+- **[README_VAULT_PKI.md](../vault/README_VAULT_PKI.md)** - Full Vault PKI documentation
+- **[PKI_SETUP_VAULT.md](../vault/PKI_SETUP_VAULT.md)** - PKI initialization guide
+- **[VAULT_HTTPS_SETUP.md](../vault/VAULT_HTTPS_SETUP.md)** - Traefik HTTPS setup
 
 ## 📜 Legacy Scripts
 

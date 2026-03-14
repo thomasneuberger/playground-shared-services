@@ -481,7 +481,7 @@ docker compose restart traefik
 - [Traefik Docker Provider](https://doc.traefik.io/traefik/providers/docker/)
 - [Traefik TLS Configuration](https://doc.traefik.io/traefik/https/tls/)
 - [Vault PKI Setup](PKI_SETUP_VAULT.md)
-- [Generate Certificates Script](scripts/README_VAULT_PKI.md)
+- [Generate Certificates Script](README_VAULT_PKI.md)
 
 ---
 

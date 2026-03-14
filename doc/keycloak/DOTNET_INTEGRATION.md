@@ -384,7 +384,7 @@ finally
 
 ## � Hinweis: Verwende Keycloak für Authentifizierung
 
-IdentityServer wurde durch Keycloak ersetzt. Siehe [Keycloak Integration](#-keycloak-integration-openid-connect) oben und [KEYCLOAK_SETUP.md](KEYCLOAK_SETUP.md) für vollständige Anweisungen.
+IdentityServer wurde durch Keycloak ersetzt. Siehe [Keycloak Integration](#-keycloak-integration-openid-connect) oben und [KEYCLOAK_SETUP.md](../keycloak/KEYCLOAK_SETUP.md) für vollständige Anweisungen.
 
 ---
 

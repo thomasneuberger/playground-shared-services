@@ -178,7 +178,7 @@ if ($Mode -eq "nginx") {
     Write-Host "  2. Run: docker compose up -d vault-nginx" -ForegroundColor White
     Write-Host "  3. Access Vault: https://localhost:8443" -ForegroundColor White
 } else {
-    Write-Host "  See VAULT_HTTPS_SETUP.md for complete server mode setup" -ForegroundColor White
+  Write-Host "  See doc/vault/VAULT_HTTPS_SETUP.md for complete server mode setup" -ForegroundColor White
 }
 Write-Host ""
-Write-Host "Documentation: VAULT_HTTPS_SETUP.md" -ForegroundColor Cyan
+Write-Host "Documentation: doc/vault/VAULT_HTTPS_SETUP.md" -ForegroundColor Cyan
