@@ -2,6 +2,12 @@
 
 Keycloak ist eine Enterprise-Grade Open-Source Identity Management Lösung mit OpenID Connect, OAuth2 und SAML Support.
 
+## 📚 Weitere Keycloak-Dokumentation
+
+- [KEYCLOAK_VAULT_HTTPS.md](./KEYCLOAK_VAULT_HTTPS.md) - HTTPS via Traefik/Vault PKI
+- [DOTNET_INTEGRATION.md](./DOTNET_INTEGRATION.md) - ASP.NET Core Integration
+- [ENTRAID_IDP_SETUP.md](./ENTRAID_IDP_SETUP.md) - Microsoft Entra ID als Identity Provider für Realm `playground`
+
 ## 🚀 Quick Start
 
 ### 1. Keycloak starten
