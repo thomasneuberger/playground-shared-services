@@ -1,0 +1,23 @@
+# Traefik Static Configuration - Gateway Mode
+# Routing is managed centrally via dynamic.yml (file provider).
+# No Docker socket access is required.
+api:
+  dashboard: true
+
+providers:
+  file:
+    filename: /etc/traefik/dynamic.yml
+    watch: true
+
+entryPoints:
+  web:
+    address: ":80"
+  websecure:
+    address: ":443"
+
+log:
+  level: INFO
+
+# Access logs for debugging (optional)
+# accessLog:
+#   filePath: "/var/log/traefik/access.log"

@@ -2,6 +2,12 @@
 
 Keycloak ist eine Enterprise-Grade Open-Source Identity Management Lösung mit OpenID Connect, OAuth2 und SAML Support.
 
+## 📚 Weitere Keycloak-Dokumentation
+
+- [KEYCLOAK_VAULT_HTTPS.md](./KEYCLOAK_VAULT_HTTPS.md) - HTTPS via Traefik/Vault PKI
+- [DOTNET_INTEGRATION.md](./DOTNET_INTEGRATION.md) - ASP.NET Core Integration
+- [ENTRAID_IDP_SETUP.md](./ENTRAID_IDP_SETUP.md) - Microsoft Entra ID als Identity Provider für Realm `playground`
+
 ## 🚀 Quick Start
 
 ### 1. Keycloak starten
@@ -490,18 +496,6 @@ keycloak-2:
     # Same as keycloak-1
     KC_CACHE: infinispan
   command: [start]
-
-# Nginx als Reverse Proxy / Load Balancer
-nginx:
-  image: nginx:latest
-  ports:
-    - "8080:8080"
-  volumes:
-    - ./nginx.conf:/etc/nginx/nginx.conf:ro
-  depends_on:
-    - keycloak-1
-    - keycloak-2
-```
 
 ## 🔍 Troubleshooting
 

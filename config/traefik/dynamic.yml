@@ -1,0 +1,146 @@
+# Traefik Dynamic Configuration - Gateway Routing
+# All HTTP routing rules are defined here (Gateway pattern).
+# To customise domains, set the corresponding environment variables in your .env file
+# and update the rules below (Traefik file provider does not evaluate shell variables).
+http:
+  routers:
+    oauth2:
+      rule: "Host(`traefik.local`) && PathPrefix(`/oauth2/`)"
+      entryPoints:
+        - websecure
+      service: oauth2-proxy-service
+      tls: {}
+
+    # Traefik Dashboard
+    dashboard:
+      rule: "Host(`traefik.local`) && (PathPrefix(`/dashboard`) || PathPrefix(`/api`))"
+      entryPoints:
+        - websecure
+      middlewares:
+        - dashboard-auth-errors
+        - dashboard-auth
+      service: "api@internal"
+      tls: {}
+
+    vault:
+      # Matches vault.local and localhost by default.
+      # For NAS deployment: add || Host(`<your-NAS-hostname>`) to this rule
+      # and update the corresponding entry in config/traefik/dynamic.yml.
+      # Example: "Host(`vault.local`) || Host(`localhost`) || Host(`nas.local`)"
+      rule: "Host(`vault.local`) || Host(`localhost`)"
+      entryPoints:
+        - websecure
+      service: vault-service
+      tls: {}
+
+    keycloak:
+      # Default domain: keycloak.local — set KEYCLOAK_DOMAIN in .env to override,
+      # then update this rule accordingly.
+      rule: "Host(`keycloak.local`)"
+      entryPoints:
+        - websecure
+      service: keycloak-service
+      tls: {}
+
+    grafana:
+      # Default domain: grafana.local — set GRAFANA_DOMAIN in .env to override.
+      rule: "Host(`grafana.local`)"
+      entryPoints:
+        - websecure
+      service: grafana-service
+      tls: {}
+
+    prometheus:
+      # Default domain: prometheus.local — set PROMETHEUS_DOMAIN in .env to override.
+      rule: "Host(`prometheus.local`)"
+      entryPoints:
+        - websecure
+      service: prometheus-service
+      tls: {}
+
+    loki:
+      # Default domain: loki.local — set LOKI_DOMAIN in .env to override.
+      rule: "Host(`loki.local`)"
+      entryPoints:
+        - websecure
+      service: loki-service
+      tls: {}
+
+    tempo:
+      # Default domain: tempo.local — set TEMPO_DOMAIN in .env to override.
+      rule: "Host(`tempo.local`)"
+      entryPoints:
+        - websecure
+      service: tempo-service
+      tls: {}
+
+  middlewares:
+    dashboard-auth-errors:
+      errors:
+        status:
+          - "401-403"
+        service: oauth2-proxy-service
+        query: "/oauth2/sign_in?rd={url}"
+
+    dashboard-auth:
+      forwardAuth:
+        address: "http://oauth2-proxy:4180/oauth2/auth"
+        trustForwardHeader: true
+        authResponseHeaders:
+          - X-Auth-Request-User
+          - X-Auth-Request-Email
+          - X-Auth-Request-Groups
+          - X-Auth-Request-Preferred-Username
+
+  services:
+    oauth2-proxy-service:
+      loadBalancer:
+        servers:
+          - url: "http://oauth2-proxy:4180"
+
+    vault-service:
+      loadBalancer:
+        servers:
+          - url: "http://vault:8201"
+
+    keycloak-service:
+      loadBalancer:
+        servers:
+          - url: "http://keycloak:8080"
+
+    grafana-service:
+      loadBalancer:
+        servers:
+          - url: "http://grafana:3000"
+
+    prometheus-service:
+      loadBalancer:
+        servers:
+          - url: "http://prometheus:9090"
+
+    loki-service:
+      loadBalancer:
+        servers:
+          - url: "http://loki:3100"
+
+    tempo-service:
+      loadBalancer:
+        servers:
+          - url: "http://tempo:3200"
+
+tls:
+  certificates:
+    - certFile: /certs/traefik.local.crt
+      keyFile: /certs/traefik.local.key
+    - certFile: /certs/vault.local.crt
+      keyFile: /certs/vault.local.key
+    - certFile: /certs/keycloak.local.crt
+      keyFile: /certs/keycloak.local.key
+    - certFile: /certs/grafana.local.crt
+      keyFile: /certs/grafana.local.key
+    - certFile: /certs/prometheus.local.crt
+      keyFile: /certs/prometheus.local.key
+    - certFile: /certs/loki.local.crt
+      keyFile: /certs/loki.local.key
+    - certFile: /certs/tempo.local.crt
+      keyFile: /certs/tempo.local.key
