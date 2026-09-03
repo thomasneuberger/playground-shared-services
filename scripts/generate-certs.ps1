@@ -8,8 +8,9 @@
 param(
     [string]$Domain,
     [string]$Client,
-    [string]$CaUrl = "http://localhost:9000",
+    [string]$CaUrl = "https://localhost:9001",
     [string]$CertsDir = ".\certs",
+    [string]$RootCertPath,
     [switch]$RootCA,
     [switch]$Help
 )
@@ -47,17 +48,36 @@ USAGE:
 PARAMETER:
   -Domain     Domain-Name für Server-Zertifikat
   -Client     Client-Name für Client-Zertifikat
-  -CaUrl      Step CA Adresse (default: http://localhost:9000)
+    -CaUrl      Step CA Adresse (default: https://localhost:9001)
   -CertsDir   Zertifikatsverzeichnis (default: .\certs)
+    -RootCertPath Pfad zum Root CA Zertifikat (default: .\certs\root_ca.crt)
   -RootCA     Root CA exportieren
   -Help       Hilfe anzeigen
 
 BEISPIELE:
   .\generate-certs.ps1 -Domain myapp.local
   .\generate-certs.ps1 -Domain api.local -Client "client@example.com"
+    .\generate-certs.ps1 -Domain myapp.local -RootCertPath .\certs\root_ca.crt
   .\generate-certs.ps1 -RootCA
 
 "@
+}
+
+function Resolve-RootCAPath {
+    if ([string]::IsNullOrWhiteSpace($RootCertPath)) {
+        $RootCertPath = Join-Path $CertsDir "root_ca.crt"
+    }
+
+    if (-not (Test-Path $RootCertPath)) {
+        Write-Warning "Root CA nicht gefunden unter '$RootCertPath'. Exportiere Root CA..."
+        $exported = Export-RootCA
+        if (-not $exported -or -not (Test-Path $RootCertPath)) {
+            Write-Error "Root CA konnte nicht exportiert werden. Gib -RootCertPath an oder führe -RootCA aus."
+            return $null
+        }
+    }
+
+    return $RootCertPath
 }
 
 function Test-StepCA {
@@ -90,12 +110,17 @@ function Generate-ServerCert {
     
     Write-Info "Generiere Server-Zertifikat für '$DomainName'..."
     
+    $rootPath = Resolve-RootCAPath
+    if (-not $rootPath) {
+        return $false
+    }
+
     # Build step command
     $stepCmd = @(
         "ca", "certificate",
         "--ca-url", $CaUrl,
+        "--root", $rootPath,
         "--san", $DomainName,
-        "--insecure",
         "--not-after", "2160h",
         $DomainName,
         "$CertsDir\$DomainName.crt",
@@ -145,11 +170,16 @@ function Generate-ClientCert {
     
     Write-Info "Generiere Client-Zertifikat für '$ClientName'..."
     
+    $rootPath = Resolve-RootCAPath
+    if (-not $rootPath) {
+        return $false
+    }
+
     try {
         & step ca certificate `
             --ca-url "$CaUrl" `
+            --root "$rootPath" `
             --profile leaf `
-            --insecure `
             --not-after 2160h `
             "$ClientName" `
             "$CertsDir\$filename.crt" `
@@ -175,22 +205,26 @@ function Generate-ClientCert {
 
 function Export-RootCA {
     Write-Info "Exportiere Root CA..."
+
+    if ([string]::IsNullOrWhiteSpace($RootCertPath)) {
+        $RootCertPath = Join-Path $CertsDir "root_ca.crt"
+    }
     
     try {
         # Try Docker copy first
-        $dockerOutput = docker cp shared-step-ca:/home/step/certs/root_ca.crt "$CertsDir\root_ca.crt" 2>&1
+        $dockerOutput = docker cp shared-step-ca:/home/step/certs/root_ca.crt "$RootCertPath" 2>&1
         
-        if (Test-Path "$CertsDir\root_ca.crt") {
-            Write-Info "✓ Root CA: $CertsDir\root_ca.crt"
+        if (Test-Path "$RootCertPath") {
+            Write-Info "✓ Root CA: $RootCertPath"
             
             Write-Warning ""
             Write-Warning "WICHTIG: Root CA ins Windows Certificate Store laden:"
             Write-Warning ""
-            Write-Warning "  `$cert = Get-Item -Path '.\certs\root_ca.crt'"
+            Write-Warning "  `$cert = Get-Item -Path '$RootCertPath'"
             Write-Warning "  Import-Certificate -FilePath `$cert.FullName -CertStoreLocation 'Cert:\LocalMachine\Root' -Confirm:`$false"
             Write-Warning ""
             Write-Warning "ODER als Administrator in der Powershell:"
-            Write-Warning "  Import-Certificate -FilePath '$(Resolve-Path "$CertsDir\root_ca.crt")' \"
+            Write-Warning "  Import-Certificate -FilePath '$(Resolve-Path "$RootCertPath")' \"
             Write-Warning "    -CertStoreLocation 'Cert:\LocalMachine\Root' -Confirm:`$false"
             Write-Warning ""
             
@@ -204,10 +238,10 @@ function Export-RootCA {
     # Fallback: Try via Invoke-WebRequest
     try {
         Invoke-WebRequest -Uri "$CaUrl/roots.pem" `
-            -OutFile "$CertsDir\root_ca.crt" `
+            -OutFile "$RootCertPath" `
             -SkipCertificateCheck
         
-        Write-Info "✓ Root CA: $CertsDir\root_ca.crt"
+        Write-Info "✓ Root CA: $RootCertPath"
         return $true
     }
     catch {
